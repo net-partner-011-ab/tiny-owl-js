@@ -1,0 +1,69 @@
+{
+  "name": "@tinyOwlJs/observability",
+  "version": "0.1.0",
+  "description": "TinyOwl JavaScript SDK - Lightweight observability and logging with enterprise-grade security",
+  "keywords": [
+    "observability",
+    "logging",
+    "monitoring",
+    "tinyowl",
+    "security",
+    "hmac",
+    "analytics"
+  ],
+  "author": "TinyOwl Team",
+  "license": "MIT",
+  "homepage": "https://github.com/Regis011/tiny-owl-kit/tree/main/tiny-owl-js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Regis011/tiny-owl-kit.git",
+    "directory": "tiny-owl-js"
+  },
+  "bugs": {
+    "url": "https://github.com/Regis011/tiny-owl-kit/issues"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --dts --format esm,cjs --clean",
+    "dev": "tsup src/index.ts --watch",
+    "test": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest",
+    "test:node": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --testEnvironment=node",
+    "test:browser": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --testEnvironment=jsdom",
+    "test:watch": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch",
+    "test:coverage": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --coverage",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.9.1",
+    "axios": "^1.12.2",
+    "cross-env": "^10.1.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "ts-jest": "^29.4.5",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3"
+  }
+}
