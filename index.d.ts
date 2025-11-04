@@ -1,19 +1,19 @@
 /**
- * Echo Nova Trace JavaScript SDK - TypeScript Definitions
+ * TinyOwl JavaScript SDK - TypeScript Definitions
  */
 
 /**
  * Event severity levels
  */
-export type Severity = 'info' | 'warning' | 'error';
+export type Severity = "info" | "warning" | "error";
 
 /**
- * Configuration options for Echo Nova client
+ * Configuration options for TinyOwl client
  */
 export interface EchoNovaConfig {
-  /** Your project's API key from Echo Nova Trace dashboard */
+  /** Your project's API key from TinyOwl dashboard */
   apiKey: string;
-  /** Base URL of the Echo Nova Trace API (default: "http://localhost:5001/api") */
+  /** Base URL of the TinyOwl API (default: "http://localhost:5001/api") */
   baseUrl?: string;
   /** Request timeout in milliseconds (default: 5000) */
   timeout?: number;
@@ -42,11 +42,11 @@ export interface LogResponse {
 }
 
 /**
- * Main SDK class for Echo Nova Trace event logging
+ * Main SDK class for TinyOwl event logging
  */
 export class EchoNova {
   /**
-   * Create a new Echo Nova client instance
+   * Create a new TinyOwl client instance
    *
    * @param config - Configuration options
    *
@@ -54,14 +54,14 @@ export class EchoNova {
    * ```typescript
    * const client = new EchoNova({
    *   apiKey: "YOUR_API_KEY",
-   *   baseUrl: "https://api.echonova.example.com/api"
+   *   baseUrl: "https://api.tinyowl.com/api"
    * });
    * ```
    */
   constructor(config: EchoNovaConfig);
 
   /**
-   * Log an event to Echo Nova Trace
+   * Log an event to TinyOwl
    *
    * @param message - Event message/description
    * @param options - Logging options

@@ -5,18 +5,12 @@ Official JavaScript SDK for TinyOwl Observability - A lightweight event logging 
 ## ⚡ Quick Start
 
 ```javascript
-import { TinyOwl, initTinyIT } from "@tinyOwlJs/observability";
+import { TinyOwl } from "@tinyOwlJs/observability";
 
-// TinyOwl SDK - Enhanced Security Mode (Recommended)
+// TinyOwl SDK - Enhanced Security Mode (Required)
 const tinyowl = new TinyOwl({
   apiKey: "YOUR_API_KEY",
-  projectSecret: "YOUR_PROJECT_SECRET", // 🔒 For HMAC verification
-});
-
-// Or use the new TinyIT SDK
-const tinyit = initTinyIT({
-  apiUrl: "https://api.tinyowl.com",
-  apiKey: "YOUR_API_KEY",
+  projectSecret: "YOUR_PROJECT_SECRET", // 🔒 Required for HMAC verification
 });
 
 // Log an event
@@ -24,18 +18,17 @@ await tinyowl.log("User signed in", {
   severity: "info",
   context: { userId: "123" },
 });
-
-// Or with TinyIT
-await tinyit.info("User signed in", { userId: "123" });
 ```
 
 ## 🛡️ Security Features
 
-### HMAC Signature Verification
+All requests to the TinyOwl backend **require HMAC signature verification**. The following security features are mandatory:
+
+### HMAC Signature Verification (Required)
 
 - **Payload Integrity**: SHA-256 HMAC ensures data hasn't been tampered with
 - **Secret-based Authentication**: Uses project secret separate from API key
-- **Automatic Security**: Enabled by default when `projectSecret` is provided
+- **Mandatory Security**: Always enabled - `projectSecret` is required
 
 ### Timestamp Validation
 
@@ -57,44 +50,20 @@ npm install @tinyOwlJs/observability
 
 ## 🔧 Configuration
 
-### TinyOwl SDK (Legacy Compatible)
-
 ```javascript
 const client = new TinyOwl({
   apiKey: "YOUR_API_KEY", // Required: Project API key
   projectSecret: "YOUR_PROJECT_SECRET", // Required: For HMAC verification
   baseUrl: "https://api.tinyowl.com", // Optional: API endpoint
   timeout: 5000, // Optional: Request timeout (ms)
-  enableHMAC: true, // Optional: Enable HMAC (default: true)
 });
 ```
 
-### TinyIT SDK (Modern)
-
-```javascript
-const tinyit = initTinyIT({
-  apiUrl: "https://api.tinyowl.com",
-  apiKey: "YOUR_API_KEY",
-  options: {
-    maxRetries: 3,
-    retryDelay: 1000,
-    timeout: 5000,
-  },
-});
-```
-
-### Legacy Mode (Backward Compatible)
-
-```javascript
-const client = new TinyOwl({
-  apiKey: "YOUR_API_KEY",
-  enableHMAC: false, // Disable security features
-});
-```
+**Note**: Both `apiKey` and `projectSecret` are required. The backend enforces HMAC verification for all requests.
 
 ## 🚀 Usage Examples
 
-### Basic Logging with TinyOwl SDK
+### Basic Logging
 
 ```javascript
 // Simple info log
@@ -112,15 +81,6 @@ await client.log("Order created", {
     currency: "USD",
   },
 });
-```
-
-### TinyIT SDK (Modern Approach)
-
-```javascript
-// Direct logging methods
-await tinyit.info("User signed in", { userId: "123" });
-await tinyit.warn("API rate limit approaching", { currentRate: 95 });
-await tinyit.error("Database connection failed", { database: "users" });
 ```
 
 ### Severity Levels
@@ -165,18 +125,25 @@ await client.error("Payment failed", {
 });
 ```
 
+### 📁 Example Files
+
+For complete, runnable examples, check out these files in the repository:
+
+- **[security-examples.js](./examples/security-examples.js)** - Basic security features, SDK configuration, error handling, and manual HMAC implementation
+- **[security-hardening.js](./examples/security-hardening.js)** - Production-ready examples, audit trails, rate limiting, HTTPS enforcement, and SDK self-tracking
+
+These examples demonstrate all security features and best practices for production deployments.
+
 ### Real-World Examples
 
 #### E-commerce Application
 
 ```javascript
-import { TinyOwl, initTinyIT } from "@tinyOwlJs/observability";
+import { TinyOwl } from "@tinyOwlJs/observability";
 
-const logger = new TinyOwl({ apiKey: process.env.TINYOWL_API_KEY });
-// Or use the modern TinyIT SDK
-const tinyit = initTinyIT({
-  apiUrl: "https://api.tinyowl.com",
+const logger = new TinyOwl({
   apiKey: process.env.TINYOWL_API_KEY,
+  projectSecret: process.env.TINYOWL_PROJECT_SECRET,
 });
 
 // Track successful purchases
@@ -187,9 +154,6 @@ async function trackPurchase(order) {
     items: order.items.length,
     userId: order.userId,
   });
-
-  // Or with TinyIT
-  await tinyit.info("Purchase completed", order);
 }
 
 // Track payment failures
@@ -300,19 +264,14 @@ try {
 
 ## TypeScript Support
 
-The SDK includes full TypeScript definitions for both SDKs:
+The SDK includes full TypeScript definitions:
 
 ```typescript
-import {
-  TinyOwl,
-  initTinyIT,
-  Severity,
-  LogOptions,
-} from "@tinyOwlJs/observability";
+import { TinyOwl, Severity, LogOptions } from "@tinyOwlJs/observability";
 
-// TinyOwl SDK
 const client = new TinyOwl({
   apiKey: "YOUR_API_KEY",
+  projectSecret: "YOUR_PROJECT_SECRET",
 });
 
 const options: LogOptions = {
@@ -324,14 +283,6 @@ const options: LogOptions = {
 };
 
 await client.log("User action", options);
-
-// TinyIT SDK
-const tinyit = initTinyIT({
-  apiUrl: "https://api.tinyowl.com",
-  apiKey: "YOUR_API_KEY",
-});
-
-await tinyit.info("User action", { userId: "123", action: "login" });
 ```
 
 ## API Response
@@ -345,7 +296,7 @@ All logging methods return a promise that resolves to:
   data: {
     eventId: "64f1a2b3c4d5e6f7g8h9i0j1",
     timestamp: "2025-09-18T10:30:45.123Z",
-    hmacVerified: true  // 🆕 Indicates HMAC verification was used
+    hmacVerified: true  // Always true - HMAC verification is mandatory
   }
 }
 ```
@@ -395,16 +346,28 @@ console.log(config);
 // {
 //   baseUrl: "https://api.tinyowl.com",
 //   timeout: 5000,
-//   enableHMAC: true,
 //   hasApiKey: true,
 //   hasProjectSecret: true,
-//   hmacEnabled: true
+//   hmacEnabled: true  // Always true
 // }
 ```
 
 ## 📚 Migration Guide
 
-Upgrading from the legacy SDK? See our [Migration Guide](./MIGRATION_GUIDE.md) for step-by-step instructions.
+Upgrading from the legacy SDK without HMAC? You must now provide a `projectSecret`:
+
+```javascript
+// Before (Legacy - No longer supported)
+const client = new TinyOwl({
+  apiKey: process.env.TINYOWL_API_KEY,
+});
+
+// After (Required)
+const client = new TinyOwl({
+  apiKey: process.env.TINYOWL_API_KEY,
+  projectSecret: process.env.TINYOWL_PROJECT_SECRET, // Now required
+});
+```
 
 ## 🔧 Environment Variables
 
@@ -421,24 +384,18 @@ const client = new TinyOwl({
   apiKey: process.env.TINYOWL_API_KEY,
   projectSecret: process.env.TINYOWL_PROJECT_SECRET,
 });
-
-// Or with TinyIT
-const tinyit = initTinyIT({
-  apiUrl: "https://api.tinyowl.com",
-  apiKey: process.env.TINYOWL_API_KEY,
-});
 ```
 
 ## Best Practices
 
 ### 🔒 Security Best Practices
 
-1. **Use Enhanced Security**: Always provide `projectSecret` for production applications
+1. **Always Provide Project Secret**: The `projectSecret` is required for all requests
 
    ```javascript
    const client = new TinyOwl({
      apiKey: process.env.TINYOWL_API_KEY,
-     projectSecret: process.env.TINYOWL_PROJECT_SECRET, // 🔒 Required for security
+     projectSecret: process.env.TINYOWL_PROJECT_SECRET, // Required
    });
    ```
 
@@ -458,13 +415,11 @@ const tinyit = initTinyIT({
    });
    ```
 
-3. **Monitor Security Verification**: Check `hmacVerified` in responses
+3. **Verify HMAC in Responses**: The `hmacVerified` field confirms secure transmission
 
    ```javascript
    const response = await client.log("Event");
-   if (!response.data?.hmacVerified) {
-     console.warn("Event logged without HMAC verification");
-   }
+   console.log(response.data.hmacVerified); // Always true
    ```
 
 ### 🚀 General Best Practices
@@ -546,5 +501,5 @@ For issues and questions:
 
 ---
 
-**Version**: 0.1.0 (TinyOwl SDK + TinyIT Modern Architecture)  
-**Last Updated**: October 26, 2025
+**Version**: 0.1.0 (TinyOwl SDK with Mandatory HMAC Security)  
+**Last Updated**: October 28, 2025

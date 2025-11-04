@@ -1,45 +1,45 @@
 /**
- * Echo Nova Trace JavaScript SDK
+ * TinyOwl JavaScript SDK
  *
- * A lightweight SDK for logging events to Echo Nova Trace backend.
+ * A lightweight SDK for logging events to TinyOwl backend.
  * Supports info, warning, and error severity levels with optional context data.
  *
  * @example
- * import { EchoNova } from "echo-nova-js";
- * const client = new EchoNova({ apiKey: "YOUR_API_KEY" });
+ * import { TinyOwl } from "@tinyOwlJs/observability";
+ * const client = new TinyOwl({ apiKey: "YOUR_API_KEY" });
  * await client.log("User signed in", { severity: "info", context: { userId: "123" } });
  */
 
 /**
- * Main SDK class for Echo Nova Trace event logging
+ * Main SDK class for TinyOwl event logging
  */
 export class EchoNova {
   /**
-   * Create a new Echo Nova client instance
+   * Create a new TinyOwl client instance
    *
    * @param {Object} config - Configuration options
-   * @param {string} config.apiKey - Your project's API key from Echo Nova Trace dashboard
-   * @param {string} [config.baseUrl="http://localhost:5001/api"] - Base URL of the Echo Nova Trace API
+   * @param {string} config.apiKey - Your project's API key from TinyOwl dashboard
+   * @param {string} [config.baseUrl="http://localhost:5001/api"] - Base URL of the TinyOwl API
    * @param {number} [config.timeout=5000] - Request timeout in milliseconds
    *
    * @example
    * const client = new EchoNova({
    *   apiKey: "YOUR_API_KEY",
-   *   baseUrl: "https://api.echonova.example.com/api"
+   *   baseUrl: "https://api.tinyowl.com/api"
    * });
    */
   constructor({ apiKey, baseUrl, timeout = 5000 }) {
     if (!apiKey) {
-      throw new Error('API key is required');
+      throw new Error("API key is required");
     }
 
     this.apiKey = apiKey;
-    this.baseUrl = baseUrl || 'http://localhost:5001/api';
+    this.baseUrl = baseUrl || "http://localhost:5001/api";
     this.timeout = timeout;
   }
 
   /**
-   * Log an event to Echo Nova Trace
+   * Log an event to TinyOwl
    *
    * @param {string} message - Event message/description
    * @param {Object} [options={}] - Logging options
@@ -72,16 +72,16 @@ export class EchoNova {
    *   }
    * });
    */
-  async log(message, { severity = 'info', context = {} } = {}) {
+  async log(message, { severity = "info", context = {} } = {}) {
     // Validate inputs
-    if (!message || typeof message !== 'string') {
-      throw new Error('Message is required and must be a string');
+    if (!message || typeof message !== "string") {
+      throw new Error("Message is required and must be a string");
     }
 
-    const validSeverities = ['info', 'warning', 'error'];
+    const validSeverities = ["info", "warning", "error"];
     if (!validSeverities.includes(severity)) {
       throw new Error(
-        `Invalid severity. Must be one of: ${validSeverities.join(', ')}`,
+        `Invalid severity. Must be one of: ${validSeverities.join(", ")}`
       );
     }
 
@@ -91,9 +91,9 @@ export class EchoNova {
 
     try {
       const response = await fetch(`${this.baseUrl}/ingest`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           apiKey: this.apiKey,
@@ -112,7 +112,7 @@ export class EchoNova {
       // Handle non-2xx responses
       if (!response.ok) {
         throw new Error(
-          data.message || `HTTP ${response.status}: ${response.statusText}`,
+          data.message || `HTTP ${response.status}: ${response.statusText}`
         );
       }
 
@@ -121,7 +121,7 @@ export class EchoNova {
       clearTimeout(timeoutId);
 
       // Handle abort/timeout
-      if (error.name === 'AbortError') {
+      if (error.name === "AbortError") {
         throw new Error(`Request timeout after ${this.timeout}ms`);
       }
 
@@ -141,7 +141,7 @@ export class EchoNova {
    * await client.info("User logged in", { userId: "123" });
    */
   async info(message, context = {}) {
-    return this.log(message, { severity: 'info', context });
+    return this.log(message, { severity: "info", context });
   }
 
   /**
@@ -155,7 +155,7 @@ export class EchoNova {
    * await client.warning("API rate limit approaching", { currentRate: 95 });
    */
   async warning(message, context = {}) {
-    return this.log(message, { severity: 'warning', context });
+    return this.log(message, { severity: "warning", context });
   }
 
   /**
@@ -169,7 +169,7 @@ export class EchoNova {
    * await client.error("Payment processing failed", { orderId: "ORD-123", error: "Card declined" });
    */
   async error(message, context = {}) {
-    return this.log(message, { severity: 'error', context });
+    return this.log(message, { severity: "error", context });
   }
 }
 

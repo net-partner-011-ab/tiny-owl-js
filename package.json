@@ -11,7 +11,7 @@
     "hmac",
     "analytics"
   ],
-  "author": "TinyOwl Team",
+  "author": "TinyOwl - Vladimir Rancic <vladimir.rancic@np011.se>",
   "license": "MIT",
   "homepage": "https://github.com/Regis011/tiny-owl-kit/tree/main/tiny-owl-js",
   "repository": {

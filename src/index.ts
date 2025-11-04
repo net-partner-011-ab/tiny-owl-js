@@ -1,31 +1,36 @@
 /**
- * Task 5.5: Entry Point - Combined SDK with EchoNova and TinyIT
- * 
- * This module provides both the original EchoNova SDK and the new TinyIT SDK
+ * Task 5.5: Entry Point - TinyOwl SDK
+ *
+ * This module provides the TinyOwl SDK (formerly EchoNova) with TinyIT integration
  * with enhanced features including queue system, retry mechanism, and security.
  */
 
-// Original EchoNova SDK imports (preserving existing functionality)
-import { createSecureHeaders, type SecurityHeaders } from './security.js';
+// TinyOwl SDK imports (preserving existing functionality)
+import { createSecureHeaders, type SecurityHeaders } from "./security.js";
 
 // New TinyIT SDK imports
-import { TinyITLogger, type TinyITLoggerConfig, type LogMetadata, type LogLevel } from './logger.js';
-import { TinyITClient, type TinyITClientConfig } from './client.js';
+import {
+  TinyITLogger,
+  type TinyITLoggerConfig,
+  type LogMetadata,
+  type LogLevel,
+} from "./logger.js";
+import { TinyITClient, type TinyITClientConfig } from "./client.js";
 
 /**
- * Event severity levels (EchoNova compatibility)
+ * Event severity levels (TinyOwl compatibility)
  */
-export type Severity = 'info' | 'warning' | 'error';
+export type Severity = "info" | "warning" | "error";
 
 /**
- * Configuration options for Echo Nova client (original)
+ * Configuration options for TinyOwl client
  */
 export interface EchoNovaConfig {
-  /** Your project's API key from Echo Nova Trace dashboard */
+  /** Your project's API key from TinyOwl dashboard */
   apiKey: string;
   /** Your project's secret for HMAC signing (recommended for security) */
   projectSecret?: string;
-  /** Base URL of the Echo Nova Trace API (default: "http://localhost:5001/api") */
+  /** Base URL of the TinyOwl API (default: "http://localhost:5001/api") */
   baseUrl?: string;
   /** Request timeout in milliseconds (default: 5000) */
   timeout?: number;
@@ -34,7 +39,7 @@ export interface EchoNovaConfig {
 }
 
 /**
- * Options for logging events (EchoNova compatibility)
+ * Options for logging events (TinyOwl compatibility)
  */
 export interface LogOptions {
   /** Event severity level (default: "info") */
@@ -44,7 +49,7 @@ export interface LogOptions {
 }
 
 /**
- * API response structure (EchoNova compatibility)
+ * API response structure (TinyOwl compatibility)
  */
 export interface LogResponse {
   success: boolean;
@@ -57,8 +62,8 @@ export interface LogResponse {
 }
 
 /**
- * Enhanced SDK class for Echo Nova Trace event logging with security features
- * (Original EchoNova implementation preserved for backward compatibility)
+ * TinyOwl SDK class for event logging with security features
+ * (Maintains backward compatibility with legacy EchoNova interface)
  */
 export class EchoNova {
   private readonly apiKey: string;
@@ -68,48 +73,53 @@ export class EchoNova {
   private readonly enableHMAC: boolean;
 
   /**
-   * Create a new Echo Nova client instance
+   * Create a new TinyOwl client instance
    */
   constructor(config: EchoNovaConfig) {
     if (!config.apiKey) {
-      throw new Error('API key is required');
+      throw new Error("API key is required");
     }
 
     this.apiKey = config.apiKey;
     this.projectSecret = config.projectSecret;
-    this.baseUrl = config.baseUrl || 'http://localhost:5001/api';
+    this.baseUrl = config.baseUrl || "http://localhost:5001/api";
     this.timeout = config.timeout || 5000;
-    
+
     // Enable HMAC by default when projectSecret is provided
-    this.enableHMAC = config.enableHMAC !== false && Boolean(this.projectSecret);
+    this.enableHMAC =
+      config.enableHMAC !== false && Boolean(this.projectSecret);
 
     // Warn if HMAC is disabled but projectSecret is provided
     if (this.projectSecret && !this.enableHMAC) {
-      console.warn('Echo Nova SDK: Project secret provided but HMAC verification is disabled. Consider enabling HMAC for better security.');
+      console.warn(
+        "TinyOwl SDK: Project secret provided but HMAC verification is disabled. Consider enabling HMAC for better security."
+      );
     }
 
     // Warn if HMAC is requested but no projectSecret is provided
     if (config.enableHMAC && !this.projectSecret) {
-      console.warn('Echo Nova SDK: HMAC verification requested but no project secret provided. Falling back to legacy authentication.');
+      console.warn(
+        "TinyOwl SDK: HMAC verification requested but no project secret provided. Falling back to legacy authentication."
+      );
       this.enableHMAC = false;
     }
   }
 
   /**
-   * Log an event to Echo Nova Trace
+   * Log an event to TinyOwl
    */
   async log(message: string, options: LogOptions = {}): Promise<LogResponse> {
     // Validate inputs
-    if (!message || typeof message !== 'string') {
-      throw new Error('Message is required and must be a string');
+    if (!message || typeof message !== "string") {
+      throw new Error("Message is required and must be a string");
     }
 
-    const { severity = 'info', context = {} } = options;
-    const validSeverities: Severity[] = ['info', 'warning', 'error'];
-    
+    const { severity = "info", context = {} } = options;
+    const validSeverities: Severity[] = ["info", "warning", "error"];
+
     if (!validSeverities.includes(severity)) {
       throw new Error(
-        `Invalid severity. Must be one of: ${validSeverities.join(', ')}`,
+        `Invalid severity. Must be one of: ${validSeverities.join(", ")}`
       );
     }
 
@@ -123,7 +133,7 @@ export class EchoNova {
 
     // Create request headers
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
 
     // Add HMAC security headers if enabled
@@ -136,10 +146,17 @@ export class EchoNova {
           context,
         };
 
-        const securityHeaders = createSecureHeaders(payloadForSignature, this.projectSecret);
+        const securityHeaders = createSecureHeaders(
+          payloadForSignature,
+          this.projectSecret
+        );
         Object.assign(headers, securityHeaders);
       } catch (error) {
-        throw new Error(`Failed to create security headers: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to create security headers: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`
+        );
       }
     }
 
@@ -149,7 +166,7 @@ export class EchoNova {
 
     try {
       const response = await fetch(`${this.baseUrl}/ingest`, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -158,12 +175,12 @@ export class EchoNova {
       clearTimeout(timeoutId);
 
       // Parse response
-      const data = await response.json() as LogResponse;
+      const data = (await response.json()) as LogResponse;
 
       // Handle non-2xx responses
       if (!response.ok) {
         throw new Error(
-          data.message || `HTTP ${response.status}: ${response.statusText}`,
+          data.message || `HTTP ${response.status}: ${response.statusText}`
         );
       }
 
@@ -172,7 +189,7 @@ export class EchoNova {
       clearTimeout(timeoutId);
 
       // Handle abort/timeout
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (error instanceof Error && error.name === "AbortError") {
         throw new Error(`Request timeout after ${this.timeout}ms`);
       }
 
@@ -184,31 +201,40 @@ export class EchoNova {
   /**
    * Log an info level event
    */
-  async info(message: string, context: Record<string, any> = {}): Promise<LogResponse> {
-    return this.log(message, { severity: 'info', context });
+  async info(
+    message: string,
+    context: Record<string, any> = {}
+  ): Promise<LogResponse> {
+    return this.log(message, { severity: "info", context });
   }
 
   /**
    * Log a warning level event
    */
-  async warning(message: string, context: Record<string, any> = {}): Promise<LogResponse> {
-    return this.log(message, { severity: 'warning', context });
+  async warning(
+    message: string,
+    context: Record<string, any> = {}
+  ): Promise<LogResponse> {
+    return this.log(message, { severity: "warning", context });
   }
 
   /**
    * Log an error level event
    */
-  async error(message: string, context: Record<string, any> = {}): Promise<LogResponse> {
-    return this.log(message, { severity: 'error', context });
+  async error(
+    message: string,
+    context: Record<string, any> = {}
+  ): Promise<LogResponse> {
+    return this.log(message, { severity: "error", context });
   }
 
   /**
    * Get SDK configuration information (useful for debugging)
    * Note: This method never exposes sensitive information like API keys or secrets
    */
-  getConfig(): Omit<EchoNovaConfig, 'apiKey' | 'projectSecret'> & { 
-    hasApiKey: boolean; 
-    hasProjectSecret: boolean; 
+  getConfig(): Omit<EchoNovaConfig, "apiKey" | "projectSecret"> & {
+    hasApiKey: boolean;
+    hasProjectSecret: boolean;
     hmacEnabled: boolean;
   } {
     return {
@@ -233,27 +259,29 @@ export interface TinyITConfig {
   /** Project secret for HMAC signing (optional, enables security) */
   projectSecret?: string;
   /** Additional configuration options */
-  options?: Partial<Omit<TinyITClientConfig, 'apiUrl' | 'apiKey' | 'projectSecret'>>;
+  options?: Partial<
+    Omit<TinyITClientConfig, "apiUrl" | "apiKey" | "projectSecret">
+  >;
 }
 
 /**
  * Task 5.5: Initialize TinyIT SDK
- * 
+ *
  * Creates a new TinyIT logger instance with the provided configuration.
  * Includes validation and enhanced error handling.
- * 
+ *
  * @param config - Configuration object with apiUrl, apiKey, and optional projectSecret
  * @returns TinyITLogger instance
- * 
+ *
  * @example
  * ```typescript
  * import { initTinyIT } from "@tinyOwlJs/observability";
- * 
+ *
  * const tinyit = initTinyIT({
  *   apiUrl: "https://api.tinyit.io",
  *   apiKey: "PUBLIC_PROJECT_KEY"
  * });
- * 
+ *
  * tinyit.info("App started");
  * tinyit.error("Something went wrong", { code: 500 });
  * ```
@@ -264,7 +292,7 @@ export function initTinyIT(config: TinyITConfig): TinyITLogger {
     throw new Error("TinyIT: Missing apiUrl or apiKey");
   }
 
-  if (typeof config.apiUrl !== 'string' || typeof config.apiKey !== 'string') {
+  if (typeof config.apiUrl !== "string" || typeof config.apiKey !== "string") {
     throw new Error("TinyIT: apiUrl and apiKey must be strings");
   }
 
@@ -288,12 +316,12 @@ export function initTinyIT(config: TinyITConfig): TinyITLogger {
 
 // Export all types and classes for advanced usage
 export {
-  // Security utilities (from original EchoNova)
+  // Security utilities (from TinyOwl SDK)
   createSecureHeaders,
   generateNonce,
   signPayload,
   type SecurityHeaders,
-} from './security.js';
+} from "./security.js";
 
 export {
   // TinyIT Logger exports
@@ -302,13 +330,13 @@ export {
   type LogMetadata,
   type LogLevel,
   createLogger,
-} from './logger.js';
+} from "./logger.js";
 
 export {
   // TinyIT Client exports
   TinyITClient,
   type TinyITClientConfig,
-} from './client.js';
+} from "./client.js";
 
 // Support both named and default exports for backward compatibility
 export default EchoNova;
