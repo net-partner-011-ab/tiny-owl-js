@@ -1,6 +1,6 @@
 {
   "name": "@tiny-owl-kit/observability",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "TinyOwl JavaScript SDK - Lightweight observability and logging with enterprise-grade security",
   "keywords": [
     "observability",
@@ -13,14 +13,14 @@
   ],
   "author": "TinyOwl - Vladimir Rancic <vladimir.rancic@np011.se>",
   "license": "MIT",
-  "homepage": "https://github.com/Regis011/tiny-owl-kit/tree/main/tiny-owl-js",
+  "homepage": "https://tiny-owl-kit.io",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Regis011/tiny-owl-kit.git",
+    "url": "https://github.com/net-partner-011-ab/tiny-owl-js",
     "directory": "tiny-owl-js"
   },
   "bugs": {
-    "url": "https://github.com/Regis011/tiny-owl-kit/issues"
+    "url": "https://github.com/net-partner-011-ab/tiny-owl-js/issues"
   },
   "type": "module",
   "main": "dist/index.js",
