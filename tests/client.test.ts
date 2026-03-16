@@ -3,16 +3,19 @@
  * Tests queue system, retry mechanism, and cross-environment compatibility
  */
 
-import axios from "axios";
 import { jest } from "@jest/globals";
-import { TinyITClient } from "../src/client.js";
-import { TinyITLogger } from "../src/logger.js";
 
-// Mock axios
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+const mockedPost = jest.fn() as jest.Mock<(...args: any[]) => Promise<any>>;
+const mockedAxios = { post: mockedPost };
+jest.unstable_mockModule("axios", () => ({
+  default: mockedAxios,
+}));
+
+const { TinyITClient } = await import("../src/client.js");
+const { TinyITLogger } = await import("../src/logger.js");
 
 describe("TinyITClient", () => {
-  let client: TinyITClient;
+  let client: InstanceType<typeof TinyITClient>;
   const mockConfig = {
     apiUrl: "https://api.test.com",
     apiKey: "test-api-key",
@@ -58,7 +61,7 @@ describe("TinyITClient", () => {
       });
 
       expect(clientWithTrailingSlash.getStatus().config.apiUrl).toBe(
-        "https://api.test.com"
+        "https://api.test.com",
       );
     });
   });
@@ -88,7 +91,7 @@ describe("TinyITClient", () => {
             "x-nonce": expect.any(String),
           }),
           timeout: 1000,
-        })
+        }),
       );
     });
 
@@ -126,7 +129,7 @@ describe("TinyITClient", () => {
         message: "no security test",
       });
 
-      const callArgs = mockedAxios.post.mock.calls[1];
+      const callArgs = mockedAxios.post.mock.calls[0];
       expect(callArgs).toBeDefined();
       const headers = callArgs![2]?.headers;
 
@@ -154,19 +157,19 @@ describe("TinyITClient", () => {
         1,
         "https://api.test.com/test1",
         { message: "test1" },
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(mockedAxios.post).toHaveBeenNthCalledWith(
         2,
         "https://api.test.com/test2",
         { message: "test2" },
-        expect.any(Object)
+        expect.any(Object),
       );
       expect(mockedAxios.post).toHaveBeenNthCalledWith(
         3,
         "https://api.test.com/test3",
         { message: "test3" },
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -174,8 +177,8 @@ describe("TinyITClient", () => {
       expect(client.getStatus().queueLength).toBe(0);
 
       // Add items to queue without processing
-      client.send("/test1", { message: "test1" });
-      client.send("/test2", { message: "test2" });
+      client.send("/test1", { message: "test1" }).catch(() => {});
+      client.send("/test2", { message: "test2" }).catch(() => {});
 
       // Note: In real usage, queue length would decrease as items are processed
       // For testing, we check initial state
@@ -253,7 +256,7 @@ describe("TinyITClient", () => {
       mockedAxios.post.mockRejectedValueOnce(clientError);
 
       await expect(
-        client.send("/test", { message: "client error test" })
+        client.send("/test", { message: "client error test" }),
       ).rejects.toMatchObject({ message: "Bad Request" });
 
       expect(mockedAxios.post).toHaveBeenCalledTimes(1); // No retries
@@ -266,7 +269,7 @@ describe("TinyITClient", () => {
       mockedAxios.post.mockRejectedValue(networkError);
 
       await expect(
-        client.send("/test", { message: "max retries test" })
+        client.send("/test", { message: "max retries test" }),
       ).rejects.toMatchObject({ message: "Persistent Network Error" });
 
       expect(mockedAxios.post).toHaveBeenCalledTimes(4); // Initial + 3 retries
@@ -326,11 +329,11 @@ describe("TinyITClient", () => {
       expect(status.isOnline).toBe(true);
       expect(mockWindow.addEventListener).toHaveBeenCalledWith(
         "online",
-        expect.any(Function)
+        expect.any(Function),
       );
       expect(mockWindow.addEventListener).toHaveBeenCalledWith(
         "offline",
-        expect.any(Function)
+        expect.any(Function),
       );
 
       // Cleanup
@@ -356,10 +359,10 @@ describe("TinyITClient", () => {
       (timeoutError as any).code = "ECONNABORTED";
       (timeoutError as any).message = "timeout of 1000ms exceeded";
 
-      mockedAxios.post.mockRejectedValueOnce(timeoutError);
+      mockedAxios.post.mockRejectedValue(timeoutError);
 
       await expect(
-        client.send("/test", { message: "timeout test" })
+        client.send("/test", { message: "timeout test" }),
       ).rejects.toMatchObject({
         message: expect.stringContaining("timeout"),
       });
@@ -398,7 +401,10 @@ describe("TinyITClient", () => {
 
     it("should track sending state correctly", async () => {
       const slowResponse = new Promise((resolve) =>
-        setTimeout(() => resolve({ data: { success: true }, status: 200 }), 100)
+        setTimeout(
+          () => resolve({ data: { success: true }, status: 200 }),
+          100,
+        ),
       );
 
       mockedAxios.post.mockReturnValueOnce(slowResponse as any);

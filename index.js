@@ -5,7 +5,7 @@
  * Supports info, warning, and error severity levels with optional context data.
  *
  * @example
- * import { TinyOwl } from "@tinyOwlJs/observability";
+ * import { TinyOwl } from "@tiny-owl-kit/observability";
  * const client = new TinyOwl({ apiKey: "YOUR_API_KEY" });
  * await client.log("User signed in", { severity: "info", context: { userId: "123" } });
  */
@@ -81,7 +81,7 @@ export class EchoNova {
     const validSeverities = ["info", "warning", "error"];
     if (!validSeverities.includes(severity)) {
       throw new Error(
-        `Invalid severity. Must be one of: ${validSeverities.join(", ")}`
+        `Invalid severity. Must be one of: ${validSeverities.join(", ")}`,
       );
     }
 
@@ -112,7 +112,7 @@ export class EchoNova {
       // Handle non-2xx responses
       if (!response.ok) {
         throw new Error(
-          data.message || `HTTP ${response.status}: ${response.statusText}`
+          data.message || `HTTP ${response.status}: ${response.statusText}`,
         );
       }
 
@@ -174,4 +174,6 @@ export class EchoNova {
 }
 
 // Support both named and default exports
+// TinyOwl is the canonical public alias
+export { EchoNova as TinyOwl };
 export default EchoNova;

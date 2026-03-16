@@ -3,16 +3,15 @@
  * Configures the testing environment for both Node.js and browser tests
  */
 
-// Mock axios for all tests
-jest.mock('axios');
+import { jest, beforeEach, afterEach } from "@jest/globals";
 
 beforeEach(() => {
-  // Clear all mocks before each test
-  jest.clearAllMocks();
-  
+  // Reset all mocks (clears calls + implementations) before each test
+  jest.resetAllMocks();
+
   // Reset console methods to avoid interference
   jest.clearAllTimers();
-  
+
   // Ensure clean environment for each test
   delete (global as any).window;
   delete (global as any).document;
@@ -34,27 +33,27 @@ afterEach(() => {
     warn: jest.fn(),
     error: jest.fn(),
   };
-  
+
   beforeEach(() => {
     Object.assign(console, mockConsole);
   });
-  
+
   afterEach(() => {
     Object.assign(console, originalConsole);
     jest.clearAllMocks();
   });
-  
+
   return mockConsole;
 };
 
 // Global fetch mock for browser environment
-Object.defineProperty(globalThis, 'fetch', {
+Object.defineProperty(globalThis, "fetch", {
   value: jest.fn(),
   writable: true,
 });
 
 // Mock performance.now for consistent timing in tests
-Object.defineProperty(globalThis, 'performance', {
+Object.defineProperty(globalThis, "performance", {
   value: {
     now: jest.fn(() => Date.now()),
   },
@@ -62,8 +61,8 @@ Object.defineProperty(globalThis, 'performance', {
 });
 
 // Mock crypto for Node.js environments that might not have it
-if (typeof globalThis.crypto === 'undefined') {
-  const crypto = require('crypto');
+if (typeof globalThis.crypto === "undefined") {
+  const crypto = require("crypto");
   globalThis.crypto = {
     randomUUID: () => crypto.randomUUID(),
     getRandomValues: (arr: any) => crypto.getRandomValues(arr),
@@ -72,10 +71,13 @@ if (typeof globalThis.crypto === 'undefined') {
 }
 
 // Helper function to create mock Response objects
-export const createMockResponse = (data: any, options: Partial<Response> = {}) => ({
+export const createMockResponse = (
+  data: any,
+  options: Partial<Response> = {},
+) => ({
   ok: true,
   status: 200,
-  statusText: 'OK',
+  statusText: "OK",
   json: () => Promise.resolve(data),
   text: () => Promise.resolve(JSON.stringify(data)),
   ...options,
@@ -85,13 +87,13 @@ export const createMockResponse = (data: any, options: Partial<Response> = {}) =
 export const createMockWindow = (overrides: any = {}) => ({
   navigator: {
     onLine: true,
-    userAgent: 'Mozilla/5.0 (Test Browser)',
-    language: 'en-US',
+    userAgent: "Mozilla/5.0 (Test Browser)",
+    language: "en-US",
     ...overrides.navigator,
   },
   location: {
-    href: 'https://example.com',
-    hostname: 'example.com',
+    href: "https://example.com",
+    hostname: "example.com",
     ...overrides.location,
   },
   addEventListener: jest.fn(),

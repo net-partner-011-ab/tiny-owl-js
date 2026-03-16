@@ -120,4 +120,6 @@ export class EchoNova {
   error(message: string, context?: Record<string, any>): Promise<LogResponse>;
 }
 
+/** @alias EchoNova — canonical public name */
+export { EchoNova as TinyOwl };
 export default EchoNova;

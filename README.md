@@ -2,10 +2,20 @@
 
 Official JavaScript SDK for TinyOwl Observability - A lightweight event logging and monitoring solution with enterprise-grade security features.
 
+## 🤖 AI Agent Setup
+
+Drop [`tinyowl-sdk.instructions.md`](./tinyowl-sdk.instructions.md) into your project root and tell your AI agent or Copilot:
+
+> "Follow the instructions in `tinyowl-sdk.instructions.md` and integrate the TinyOwl SDK."
+
+The file contains step-by-step integration instructions, framework examples (Express, Next.js, Node.js), error handling patterns, and security guidelines — everything an AI agent needs to complete the integration in one pass.
+
+---
+
 ## ⚡ Quick Start
 
 ```javascript
-import { TinyOwl } from "@tinyOwlJs/observability";
+import { TinyOwl } from "@tiny-owl-kit/observability";
 
 // TinyOwl SDK - Enhanced Security Mode (Required)
 const tinyowl = new TinyOwl({
@@ -45,7 +55,7 @@ All requests to the TinyOwl backend **require HMAC signature verification**. The
 ## 📦 Installation
 
 ```bash
-npm install @tinyOwlJs/observability
+npm install @tiny-owl-kit/observability
 ```
 
 ## 🔧 Configuration
@@ -139,7 +149,7 @@ These examples demonstrate all security features and best practices for producti
 #### E-commerce Application
 
 ```javascript
-import { TinyOwl } from "@tinyOwlJs/observability";
+import { TinyOwl } from "@tiny-owl-kit/observability";
 
 const logger = new TinyOwl({
   apiKey: process.env.TINYOWL_API_KEY,
@@ -267,7 +277,7 @@ try {
 The SDK includes full TypeScript definitions:
 
 ```typescript
-import { TinyOwl, Severity, LogOptions } from "@tinyOwlJs/observability";
+import { TinyOwl, Severity, LogOptions } from "@tiny-owl-kit/observability";
 
 const client = new TinyOwl({
   apiKey: "YOUR_API_KEY",
@@ -312,7 +322,7 @@ import {
   createSecureHeaders,
   signPayload,
   generateNonce,
-} from "@tinyOwlJs/observability";
+} from "@tiny-owl-kit/observability";
 
 const eventData = {
   message: "Custom security implementation",
@@ -436,7 +446,6 @@ const client = new TinyOwl({
    ```
 
 2. **Use Appropriate Severity Levels**:
-
    - `info`: Regular operational events
    - `warning`: Unusual events that may require attention
    - `error`: Errors and failures that need immediate attention

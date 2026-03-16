@@ -3,15 +3,18 @@
  * Tests cross-environment compatibility, specifically browser features
  */
 
-import { initTinyIT } from '../src/index.js';
+import { jest } from "@jest/globals";
 
-describe('Browser Environment Compatibility', () => {
-  let mockFetch: jest.MockedFunction<typeof fetch>;
+const mockedPost = jest.fn() as jest.Mock<(...args: any[]) => Promise<any>>;
+const mockedAxios = { post: mockedPost };
+jest.unstable_mockModule("axios", () => ({
+  default: mockedAxios,
+}));
 
+const { initTinyIT } = await import("../src/index.js");
+
+describe("Browser Environment Compatibility", () => {
   beforeEach(() => {
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
-    
     // Clear any previous window mock
     delete (global as any).window;
   });
@@ -21,69 +24,75 @@ describe('Browser Environment Compatibility', () => {
     delete (global as any).window;
   });
 
-  describe('Network Status Detection', () => {
-    it('should detect online status in browser', () => {
+  describe("Network Status Detection", () => {
+    it("should detect online status in browser", () => {
       // Mock browser environment
       const mockWindow = {
         navigator: { onLine: true },
         addEventListener: jest.fn(),
       };
-      
+
       (global as any).window = mockWindow;
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
       });
 
       const status = tinyit.getStatus();
       expect(status.client.isOnline).toBe(true);
-      
+
       // Should register event listeners
-      expect(mockWindow.addEventListener).toHaveBeenCalledWith('online', expect.any(Function));
-      expect(mockWindow.addEventListener).toHaveBeenCalledWith('offline', expect.any(Function));
+      expect(mockWindow.addEventListener).toHaveBeenCalledWith(
+        "online",
+        expect.any(Function),
+      );
+      expect(mockWindow.addEventListener).toHaveBeenCalledWith(
+        "offline",
+        expect.any(Function),
+      );
     });
 
-    it('should detect offline status in browser', () => {
+    it("should detect offline status in browser", () => {
       const mockWindow = {
         navigator: { onLine: false },
         addEventListener: jest.fn(),
       };
-      
+
       (global as any).window = mockWindow;
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
       });
 
       const status = tinyit.getStatus();
       expect(status.client.isOnline).toBe(false);
     });
 
-    it('should handle missing navigator gracefully', () => {
+    it("should handle missing navigator gracefully", () => {
       const mockWindow = {
         addEventListener: jest.fn(),
       };
-      
+
       (global as any).window = mockWindow;
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
       });
 
       // Should not crash and default to online
       expect(() => tinyit.getStatus()).not.toThrow();
     });
 
-    it('should work without window object (Node.js)', () => {
+    it("should work without window object (Node.js)", () => {
       // Ensure no window object
       expect((global as any).window).toBeUndefined();
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
       });
 
       const status = tinyit.getStatus();
@@ -91,78 +100,81 @@ describe('Browser Environment Compatibility', () => {
     });
   });
 
-  describe('Fetch API Usage', () => {
-    it('should use global fetch in browser environment', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+  describe("Request Sending", () => {
+    it("should send requests to the configured API endpoint", async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { success: true },
         status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-
-      const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
       });
 
-      await tinyit.info('Browser fetch test');
+      const tinyit = initTinyIT({
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
+      });
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.test.com/logs',
+      await tinyit.info("Browser fetch test");
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        "https://api.test.com/logs",
         expect.objectContaining({
-          method: 'POST',
+          level: "info",
+          message: "Browser fetch test",
+        }),
+        expect.objectContaining({
           headers: expect.objectContaining({
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           }),
-        })
+        }),
       );
     });
 
-    it('should handle fetch errors gracefully', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network Error'));
+    it("should handle request errors gracefully", async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error("Network Error"));
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
         options: {
           maxRetries: 0,
         },
       });
 
-      await expect(tinyit.info('Fetch error test')).rejects.toThrow('Network Error');
+      await expect(tinyit.info("Fetch error test")).rejects.toThrow(
+        "Network Error",
+      );
     });
 
-    it('should handle non-ok responses', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: () => Promise.resolve({ message: 'Endpoint not found' }),
-      } as Response);
+    it("should handle server error responses", async () => {
+      const serverError = Object.assign(new Error("Endpoint not found"), {
+        response: { status: 404, data: { message: "Endpoint not found" } },
+      });
+      mockedAxios.post.mockRejectedValueOnce(serverError);
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
         options: {
           maxRetries: 0,
         },
       });
 
-      await expect(tinyit.info('404 test')).rejects.toThrow('Endpoint not found');
+      await expect(tinyit.info("404 test")).rejects.toThrow(
+        "Endpoint not found",
+      );
     });
   });
 
-  describe('Browser-Specific Features', () => {
-    it('should work with browser-specific metadata', async () => {
-      // Mock browser globals
+  describe("Browser-Specific Features", () => {
+    it("should work with browser-specific metadata", async () => {
       const mockWindow = {
         navigator: {
           onLine: true,
-          userAgent: 'Mozilla/5.0 (Test Browser)',
-          language: 'en-US',
+          userAgent: "Mozilla/5.0 (Test Browser)",
+          language: "en-US",
         },
         location: {
-          href: 'https://example.com/page',
-          hostname: 'example.com',
+          href: "https://example.com/page",
+          hostname: "example.com",
         },
         screen: {
           width: 1920,
@@ -170,40 +182,38 @@ describe('Browser Environment Compatibility', () => {
         },
         addEventListener: jest.fn(),
       };
-      
+
       (global as any).window = mockWindow;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { success: true },
         status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-
-      const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
       });
 
-      await tinyit.info('Browser metadata test', {
+      const tinyit = initTinyIT({
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
+      });
+
+      await tinyit.info("Browser metadata test", {
         userAgent: mockWindow.navigator.userAgent,
         language: mockWindow.navigator.language,
         url: mockWindow.location.href,
         screenResolution: `${mockWindow.screen.width}x${mockWindow.screen.height}`,
       });
 
-      const callArgs = mockFetch.mock.calls[0];
-      const body = JSON.parse(callArgs![1]!.body as string);
-      
-      expect(body.meta.userAgent).toBe('Mozilla/5.0 (Test Browser)');
-      expect(body.meta.language).toBe('en-US');
-      expect(body.meta.url).toBe('https://example.com/page');
-      expect(body.meta.screenResolution).toBe('1920x1080');
+      const callArgs = mockedAxios.post.mock.calls[0];
+      const body = callArgs?.[1] as any;
+
+      expect(body.meta.userAgent).toBe("Mozilla/5.0 (Test Browser)");
+      expect(body.meta.language).toBe("en-US");
+      expect(body.meta.url).toBe("https://example.com/page");
+      expect(body.meta.screenResolution).toBe("1920x1080");
     });
 
-    it('should handle localStorage/sessionStorage metadata safely', async () => {
-      // Mock browser storage
+    it("should handle localStorage/sessionStorage metadata safely", async () => {
       const mockStorage = {
-        getItem: jest.fn().mockReturnValue('test-value'),
+        getItem: jest.fn().mockReturnValue("test-value"),
         setItem: jest.fn(),
         removeItem: jest.fn(),
         clear: jest.fn(),
@@ -214,147 +224,146 @@ describe('Browser Environment Compatibility', () => {
       (global as any).localStorage = mockStorage;
       (global as any).sessionStorage = mockStorage;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { success: true },
         status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
+      });
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
       });
 
-      await tinyit.info('Storage test', {
-        sessionId: mockStorage.getItem('sessionId'),
-        hasLocalStorage: typeof localStorage !== 'undefined',
+      await tinyit.info("Storage test", {
+        sessionId: mockStorage.getItem("sessionId"),
+        hasLocalStorage: typeof localStorage !== "undefined",
       });
 
-      expect(mockStorage.getItem).toHaveBeenCalledWith('sessionId');
+      expect(mockStorage.getItem).toHaveBeenCalledWith("sessionId");
     });
   });
 
-  describe('Performance Monitoring', () => {
-    it('should handle performance.now() if available', async () => {
+  describe("Performance Monitoring", () => {
+    it("should handle performance.now() if available", async () => {
       const mockPerformance = {
         now: jest.fn().mockReturnValue(1234.5),
       };
-      
+
       (global as any).performance = mockPerformance;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { success: true },
         status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
+      });
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
       });
 
       const startTime = performance.now();
-      await tinyit.info('Performance test', { startTime });
+      await tinyit.info("Performance test", { startTime });
 
       expect(mockPerformance.now).toHaveBeenCalled();
     });
 
-    it('should fallback gracefully without performance API', async () => {
-      // Ensure performance is not available
+    it("should fallback gracefully without performance API", async () => {
       delete (global as any).performance;
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { success: true },
         status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-
-      const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
       });
 
-      // Should not crash without performance API
-      await expect(tinyit.info('No performance API test')).resolves.not.toThrow();
+      const tinyit = initTinyIT({
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
+      });
+
+      await expect(
+        tinyit.info("No performance API test"),
+      ).resolves.not.toThrow();
     });
   });
 
-  describe('Error Handling in Browser', () => {
-    it('should handle browser-specific errors', async () => {
-      const browserError = new Error('SecurityError: Blocked by CORS policy');
-      mockFetch.mockRejectedValueOnce(browserError);
+  describe("Error Handling in Browser", () => {
+    it("should handle browser-specific errors", async () => {
+      const browserError = new Error("SecurityError: Blocked by CORS policy");
+      mockedAxios.post.mockRejectedValueOnce(browserError);
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
         options: {
           maxRetries: 0,
         },
       });
 
-      await expect(tinyit.info('CORS error test')).rejects.toThrow('SecurityError');
+      await expect(tinyit.info("CORS error test")).rejects.toThrow(
+        "SecurityError",
+      );
     });
 
-    it('should handle quota exceeded errors', async () => {
-      const quotaError = new Error('QuotaExceededError: The quota has been exceeded');
-      mockFetch.mockRejectedValueOnce(quotaError);
+    it("should handle quota exceeded errors", async () => {
+      const quotaError = new Error(
+        "QuotaExceededError: The quota has been exceeded",
+      );
+      mockedAxios.post.mockRejectedValueOnce(quotaError);
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
         options: {
           maxRetries: 0,
         },
       });
 
-      await expect(tinyit.info('Quota error test')).rejects.toThrow('QuotaExceededError');
+      await expect(tinyit.info("Quota error test")).rejects.toThrow(
+        "QuotaExceededError",
+      );
     });
   });
 
-  describe('Offline Queue Behavior', () => {
-    it('should queue requests when offline in browser', async () => {
+  describe("Offline Queue Behavior", () => {
+    it("should queue requests when offline in browser", async () => {
       const mockWindow = {
         navigator: { onLine: false },
         addEventListener: jest.fn(),
       };
-      
+
       (global as any).window = mockWindow;
 
       const tinyit = initTinyIT({
-        apiUrl: 'https://api.test.com',
-        apiKey: 'test-key',
+        apiUrl: "https://api.test.com",
+        apiKey: "test-key",
       });
 
-      // Initial status should be offline
       expect(tinyit.getStatus().client.isOnline).toBe(false);
 
-      // This should be queued, not sent immediately
-      const logPromise = tinyit.info('Offline test');
+      const logPromise = tinyit.info("Offline test");
 
-      // Fetch should not be called while offline
-      expect(mockFetch).not.toHaveBeenCalled();
+      // Should not send while offline
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+
+      // Set up response before going online so the queued request resolves
+      mockedAxios.post.mockResolvedValueOnce({
+        data: { success: true },
+        status: 200,
+      });
 
       // Simulate going online
       mockWindow.navigator.onLine = true;
-      const onlineHandler = mockWindow.addEventListener.mock.calls
-        .find(call => call[0] === 'online')?.[1];
-      
-      if (onlineHandler) {
-        onlineHandler();
+      const onlineHandler = mockWindow.addEventListener.mock.calls.find(
+        (call) => call[0] === "online",
+      )?.[1];
+
+      if (typeof onlineHandler === "function") {
+        (onlineHandler as () => void)();
       }
 
-      // Mock successful response for when request is processed
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
+      await logPromise;
 
-      // Force process the queue
-      await tinyit.flush();
-
-      // Now fetch should be called
-      expect(mockFetch).toHaveBeenCalled();
+      expect(mockedAxios.post).toHaveBeenCalled();
     });
   });
 });

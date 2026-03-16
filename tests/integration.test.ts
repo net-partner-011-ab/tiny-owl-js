@@ -3,78 +3,91 @@
  * Tests the main entry point and integration between components
  */
 
-import { initTinyIT, TinyITLogger } from '../src/index.js';
+import { jest } from "@jest/globals";
 
-describe('initTinyIT Integration', () => {
+const mockedPost = jest.fn() as jest.Mock<(...args: any[]) => Promise<any>>;
+const mockedAxios = { post: mockedPost };
+jest.unstable_mockModule("axios", () => ({
+  default: mockedAxios,
+}));
+
+const { initTinyIT, TinyITLogger } = await import("../src/index.js");
+describe("initTinyIT Integration", () => {
   const validConfig = {
-    apiUrl: 'https://api.test.com',
-    apiKey: 'test-api-key',
+    apiUrl: "https://api.test.com",
+    apiKey: "test-api-key",
   };
 
-  describe('Configuration Validation', () => {
-    it('should create TinyIT instance with valid configuration', () => {
+  describe("Configuration Validation", () => {
+    it("should create TinyIT instance with valid configuration", () => {
       const tinyit = initTinyIT(validConfig);
       expect(tinyit).toBeInstanceOf(TinyITLogger);
     });
 
-    it('should throw error when apiUrl is missing', () => {
-      expect(() => initTinyIT({ apiKey: 'test-key' } as any))
-        .toThrow('TinyIT: Missing apiUrl or apiKey');
+    it("should throw error when apiUrl is missing", () => {
+      expect(() => initTinyIT({ apiKey: "test-key" } as any)).toThrow(
+        "TinyIT: Missing apiUrl or apiKey",
+      );
     });
 
-    it('should throw error when apiKey is missing', () => {
-      expect(() => initTinyIT({ apiUrl: 'https://api.test.com' } as any))
-        .toThrow('TinyIT: Missing apiUrl or apiKey');
+    it("should throw error when apiKey is missing", () => {
+      expect(() =>
+        initTinyIT({ apiUrl: "https://api.test.com" } as any),
+      ).toThrow("TinyIT: Missing apiUrl or apiKey");
     });
 
-    it('should throw error when both apiUrl and apiKey are missing', () => {
-      expect(() => initTinyIT({} as any))
-        .toThrow('TinyIT: Missing apiUrl or apiKey');
+    it("should throw error when both apiUrl and apiKey are missing", () => {
+      expect(() => initTinyIT({} as any)).toThrow(
+        "TinyIT: Missing apiUrl or apiKey",
+      );
     });
 
-    it('should throw error when apiUrl is not a string', () => {
-      expect(() => initTinyIT({ apiUrl: 123, apiKey: 'test-key' } as any))
-        .toThrow('TinyIT: apiUrl and apiKey must be strings');
+    it("should throw error when apiUrl is not a string", () => {
+      expect(() =>
+        initTinyIT({ apiUrl: 123, apiKey: "test-key" } as any),
+      ).toThrow("TinyIT: apiUrl and apiKey must be strings");
     });
 
-    it('should throw error when apiKey is not a string', () => {
-      expect(() => initTinyIT({ apiUrl: 'https://api.test.com', apiKey: 123 } as any))
-        .toThrow('TinyIT: apiUrl and apiKey must be strings');
+    it("should throw error when apiKey is not a string", () => {
+      expect(() =>
+        initTinyIT({ apiUrl: "https://api.test.com", apiKey: 123 } as any),
+      ).toThrow("TinyIT: apiUrl and apiKey must be strings");
     });
 
-    it('should throw error when apiUrl is invalid URL format', () => {
-      expect(() => initTinyIT({ apiUrl: 'not-a-url', apiKey: 'test-key' }))
-        .toThrow('TinyIT: Invalid apiUrl format');
+    it("should throw error when apiUrl is invalid URL format", () => {
+      expect(() =>
+        initTinyIT({ apiUrl: "not-a-url", apiKey: "test-key" }),
+      ).toThrow("TinyIT: Invalid apiUrl format");
     });
 
-    it('should accept valid URL formats', () => {
+    it("should accept valid URL formats", () => {
       const validUrls = [
-        'https://api.test.com',
-        'http://localhost:3000',
-        'https://subdomain.example.com/api/v1',
-        'http://127.0.0.1:8080',
+        "https://api.test.com",
+        "http://localhost:3000",
+        "https://subdomain.example.com/api/v1",
+        "http://127.0.0.1:8080",
       ];
 
-      validUrls.forEach(apiUrl => {
-        expect(() => initTinyIT({ apiUrl, apiKey: 'test-key' })).not.toThrow();
+      validUrls.forEach((apiUrl) => {
+        expect(() => initTinyIT({ apiUrl, apiKey: "test-key" })).not.toThrow();
       });
     });
   });
 
-  describe('Configuration Options', () => {
-    it('should pass through project secret', () => {
+  describe("Configuration Options", () => {
+    it("should pass through project secret", () => {
       const config = {
         ...validConfig,
-        projectSecret: 'test-secret',
+        projectSecret: "test-secret",
       };
 
       const tinyit = initTinyIT(config);
       const status = tinyit.getStatus();
-      
+
       expect(status.client.config.hasProjectSecret).toBe(true);
     });
 
-    it('should pass through additional options', () => {
+    it("should pass through additional options", () => {
       const config = {
         ...validConfig,
         options: {
@@ -86,13 +99,13 @@ describe('initTinyIT Integration', () => {
 
       const tinyit = initTinyIT(config);
       const status = tinyit.getStatus();
-      
+
       expect(status.client.config.maxRetries).toBe(5);
       expect(status.client.config.timeout).toBe(10000);
       expect(status.client.config.securityEnabled).toBe(false);
     });
 
-    it('should handle empty options object', () => {
+    it("should handle empty options object", () => {
       const config = {
         ...validConfig,
         options: {},
@@ -102,180 +115,161 @@ describe('initTinyIT Integration', () => {
     });
   });
 
-  describe('Return Value', () => {
-    it('should return working logger instance', async () => {
+  describe("Return Value", () => {
+    it("should return working logger instance", async () => {
       const tinyit = initTinyIT(validConfig);
-      
+
       // Should have logging methods
-      expect(typeof tinyit.info).toBe('function');
-      expect(typeof tinyit.error).toBe('function');
-      expect(typeof tinyit.warn).toBe('function');
-      
+      expect(typeof tinyit.info).toBe("function");
+      expect(typeof tinyit.error).toBe("function");
+      expect(typeof tinyit.warn).toBe("function");
+
       // Should have utility methods
-      expect(typeof tinyit.getStatus).toBe('function');
-      expect(typeof tinyit.flush).toBe('function');
-      expect(typeof tinyit.clearPendingLogs).toBe('function');
+      expect(typeof tinyit.getStatus).toBe("function");
+      expect(typeof tinyit.flush).toBe("function");
+      expect(typeof tinyit.clearPendingLogs).toBe("function");
     });
 
-    it('should return logger with correct configuration', () => {
+    it("should return logger with correct configuration", () => {
       const config = {
-        apiUrl: 'https://custom-api.com',
-        apiKey: 'custom-key',
-        projectSecret: 'custom-secret',
+        apiUrl: "https://custom-api.com",
+        apiKey: "custom-key",
+        projectSecret: "custom-secret",
       };
 
       const tinyit = initTinyIT(config);
       const status = tinyit.getStatus();
-      
-      expect(status.client.config.apiUrl).toBe('https://custom-api.com');
+
+      expect(status.client.config.apiUrl).toBe("https://custom-api.com");
       expect(status.client.config.hasApiKey).toBe(true);
       expect(status.client.config.hasProjectSecret).toBe(true);
     });
   });
 });
 
-describe('End-to-End Integration', () => {
-  let mockFetch: jest.MockedFunction<typeof fetch>;
-
-  beforeEach(() => {
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
-  });
-
+describe("End-to-End Integration", () => {
   afterEach(() => {
     jest.resetAllMocks();
   });
 
-  it('should handle complete logging flow', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
+  it("should handle complete logging flow", async () => {
+    mockedAxios.post.mockResolvedValueOnce({
+      data: { success: true, eventId: "evt_123" },
       status: 200,
-      json: () => Promise.resolve({ success: true, eventId: 'evt_123' }),
-    } as Response);
-
-    const tinyit = initTinyIT({
-      apiUrl: 'https://api.test.com',
-      apiKey: 'test-key',
-      projectSecret: 'test-secret',
     });
 
-    await tinyit.info('Integration test message', { testId: '123' });
+    const tinyit = initTinyIT({
+      apiUrl: "https://api.test.com",
+      apiKey: "test-key",
+      projectSecret: "test-secret",
+    });
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.test.com/logs',
+    await tinyit.info("Integration test message", { testId: "123" });
+
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      "https://api.test.com/logs",
       expect.objectContaining({
-        method: 'POST',
+        level: "info",
+        message: "Integration test message",
+        meta: { testId: "123" },
+        timestamp: expect.any(String),
+      }),
+      expect.objectContaining({
         headers: expect.objectContaining({
-          'Content-Type': 'application/json',
-          'x-api-key': 'test-key',
-          'x-tinyit-sdk-version': '0.1.0',
-          'x-signature': expect.any(String),
-          'x-timestamp': expect.any(String),
-          'x-nonce': expect.any(String),
+          "Content-Type": "application/json",
+          "x-api-key": "test-key",
+          "x-tinyit-sdk-version": "0.1.0",
+          "x-signature": expect.any(String),
+          "x-timestamp": expect.any(String),
+          "x-nonce": expect.any(String),
         }),
-        body: expect.stringContaining('Integration test message'),
-      })
+      }),
     );
   });
 
-  it('should handle network errors with retry', async () => {
-    // First call fails, second succeeds
-    mockFetch
-      .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
+  it("should handle network errors with retry", async () => {
+    const networkError = Object.assign(new Error("Network error"), {
+      code: "ENOTFOUND",
+    });
+    mockedAxios.post
+      .mockRejectedValueOnce(networkError)
+      .mockResolvedValueOnce({ data: { success: true }, status: 200 });
 
     const tinyit = initTinyIT({
-      apiUrl: 'https://api.test.com',
-      apiKey: 'test-key',
+      apiUrl: "https://api.test.com",
+      apiKey: "test-key",
       options: {
         maxRetries: 1,
-        retryDelay: 10, // Fast retry for testing
+        retryDelay: 10,
       },
     });
 
-    await tinyit.error('Network error test', { retry: true });
+    await tinyit.error("Network error test", { retry: true });
 
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockedAxios.post).toHaveBeenCalledTimes(2);
   });
 
-  it('should work without project secret (legacy mode)', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
+  it("should work without project secret (legacy mode)", async () => {
+    mockedAxios.post.mockResolvedValueOnce({
+      data: { success: true },
       status: 200,
-      json: () => Promise.resolve({ success: true }),
-    } as Response);
-
-    const tinyit = initTinyIT({
-      apiUrl: 'https://api.test.com',
-      apiKey: 'test-key',
-      // No project secret
     });
 
-    await tinyit.warn('Legacy mode test');
+    const tinyit = initTinyIT({
+      apiUrl: "https://api.test.com",
+      apiKey: "test-key",
+    });
 
-    const callArgs = mockFetch.mock.calls[0];
-    const headers = callArgs![1]!.headers as Record<string, string>;
-    
-    // Should not have security headers
-    expect(headers['x-signature']).toBeUndefined();
-    expect(headers['x-timestamp']).toBeUndefined();
-    expect(headers['x-nonce']).toBeUndefined();
-    
-    // Should still have basic headers
-    expect(headers['x-api-key']).toBe('test-key');
-    expect(headers['x-tinyit-sdk-version']).toBe('0.1.0');
+    await tinyit.warn("Legacy mode test");
+
+    const callArgs = mockedAxios.post.mock.calls[0];
+    const headers = callArgs?.[2]?.headers as
+      | Record<string, string>
+      | undefined;
+
+    expect(headers?.["x-signature"]).toBeUndefined();
+    expect(headers?.["x-timestamp"]).toBeUndefined();
+    expect(headers?.["x-nonce"]).toBeUndefined();
+    expect(headers?.["x-api-key"]).toBe("test-key");
+    expect(headers?.["x-tinyit-sdk-version"]).toBe("0.1.0");
   });
 
-  it('should handle server errors appropriately', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      json: () => Promise.resolve({ message: 'Server error' }),
-    } as Response);
+  it("should handle server errors appropriately", async () => {
+    const serverError = Object.assign(new Error("Server error"), {
+      response: { status: 500, data: { message: "Server error" } },
+    });
+    mockedAxios.post.mockRejectedValueOnce(serverError);
 
     const tinyit = initTinyIT({
-      apiUrl: 'https://api.test.com',
-      apiKey: 'test-key',
+      apiUrl: "https://api.test.com",
+      apiKey: "test-key",
       options: {
-        maxRetries: 0, // No retries for this test
+        maxRetries: 0,
       },
     });
 
-    await expect(tinyit.info('Server error test'))
-      .rejects.toThrow('Server error');
+    await expect(tinyit.info("Server error test")).rejects.toThrow(
+      "Server error",
+    );
   });
 });
 
-describe('Real-World Usage Scenarios', () => {
-  let mockFetch: jest.MockedFunction<typeof fetch>;
-
-  beforeEach(() => {
-    mockFetch = jest.fn();
-    global.fetch = mockFetch;
-  });
-
+describe("Real-World Usage Scenarios", () => {
   afterEach(() => {
     jest.resetAllMocks();
   });
 
-  it('should handle high-frequency logging', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
+  it("should handle high-frequency logging", async () => {
+    mockedAxios.post.mockResolvedValue({
+      data: { success: true },
       status: 200,
-      json: () => Promise.resolve({ success: true }),
-    } as Response);
-
-    const tinyit = initTinyIT({
-      apiUrl: 'https://api.test.com',
-      apiKey: 'test-key',
     });
 
-    // Simulate rapid logging
+    const tinyit = initTinyIT({
+      apiUrl: "https://api.test.com",
+      apiKey: "test-key",
+    });
+
     const promises = [];
     for (let i = 0; i < 20; i++) {
       promises.push(tinyit.info(`High frequency log ${i}`, { index: i }));
@@ -283,64 +277,61 @@ describe('Real-World Usage Scenarios', () => {
 
     await Promise.all(promises);
 
-    expect(mockFetch).toHaveBeenCalledTimes(20);
+    expect(mockedAxios.post).toHaveBeenCalledTimes(20);
   });
 
-  it('should handle mixed log levels appropriately', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
+  it("should handle mixed log levels appropriately", async () => {
+    mockedAxios.post.mockResolvedValue({
+      data: { success: true },
       status: 200,
-      json: () => Promise.resolve({ success: true }),
-    } as Response);
-
-    const tinyit = initTinyIT({
-      apiUrl: 'https://api.test.com',
-      apiKey: 'test-key',
     });
 
-    await tinyit.info('Application started', { version: '1.0.0' });
-    await tinyit.warn('Memory usage high', { usage: 85 });
-    await tinyit.error('Database connection failed', { error: 'ECONNREFUSED' });
-    await tinyit.info('Retrying database connection');
+    const tinyit = initTinyIT({
+      apiUrl: "https://api.test.com",
+      apiKey: "test-key",
+    });
 
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+    await tinyit.info("Application started", { version: "1.0.0" });
+    await tinyit.warn("Memory usage high", { usage: 85 });
+    await tinyit.error("Database connection failed", { error: "ECONNREFUSED" });
+    await tinyit.info("Retrying database connection");
 
-    // Verify each call had correct log level
-    const calls = mockFetch.mock.calls;
-    const bodies = calls.map(call => JSON.parse(call[1]!.body as string));
-    
-    expect(bodies[0].level).toBe('info');
-    expect(bodies[1].level).toBe('warn');
-    expect(bodies[2].level).toBe('error');
-    expect(bodies[3].level).toBe('info');
+    expect(mockedAxios.post).toHaveBeenCalledTimes(4);
+
+    const calls = mockedAxios.post.mock.calls;
+    const bodies = calls.map((call: any[]) => call[1] as any);
+
+    expect(bodies[0]?.level).toBe("info");
+    expect(bodies[1]?.level).toBe("warn");
+    expect(bodies[2]?.level).toBe("error");
+    expect(bodies[3]?.level).toBe("info");
   });
 
-  it('should handle complex metadata structures', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
+  it("should handle complex metadata structures", async () => {
+    mockedAxios.post.mockResolvedValue({
+      data: { success: true },
       status: 200,
-      json: () => Promise.resolve({ success: true }),
-    } as Response);
+    });
 
     const tinyit = initTinyIT({
-      apiUrl: 'https://api.test.com',
-      apiKey: 'test-key',
+      apiUrl: "https://api.test.com",
+      apiKey: "test-key",
     });
 
     const complexMeta = {
       user: {
-        id: '12345',
-        email: 'test@example.com',
-        roles: ['admin', 'user'],
+        id: "12345",
+        email: "test@example.com",
+        roles: ["admin", "user"],
       },
       request: {
-        method: 'POST',
-        url: '/api/users',
+        method: "POST",
+        url: "/api/users",
         headers: {
-          'content-type': 'application/json',
-          'user-agent': 'Test Client 1.0',
+          "content-type": "application/json",
+          "user-agent": "Test Client 1.0",
         },
-        body: { name: 'Test User' },
+        body: { name: "Test User" },
       },
       performance: {
         startTime: Date.now(),
@@ -352,11 +343,11 @@ describe('Real-World Usage Scenarios', () => {
       },
     };
 
-    await tinyit.info('Complex metadata test', complexMeta);
+    await tinyit.info("Complex metadata test", complexMeta);
 
-    const callArgs = mockFetch.mock.calls[0];
-    const body = JSON.parse(callArgs![1]!.body as string);
-    
+    const callArgs = mockedAxios.post.mock.calls[0];
+    const body = callArgs?.[1] as any;
+
     expect(body.meta).toEqual(complexMeta);
   });
 });

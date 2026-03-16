@@ -1,6 +1,6 @@
 /**
  * Task 5.3: HTTP Client with Retry and Queue System
- * 
+ *
  * TinyITClient provides a robust HTTP client with:
  * - Request queuing for offline scenarios
  * - Automatic retry mechanism with exponential backoff
@@ -8,8 +8,8 @@
  * - Security header integration
  */
 
-import axios, { type AxiosError, type AxiosResponse } from 'axios';
-import { createSecureHeaders, type SecurityHeaders } from './security.js';
+import axios, { type AxiosError, type AxiosResponse } from "axios";
+import { createSecureHeaders, type SecurityHeaders } from "./security.js";
 
 /**
  * Configuration options for TinyITClient
@@ -66,22 +66,25 @@ export class TinyITClient {
   private isOnline = true;
 
   constructor(config: TinyITClientConfig) {
-    this.apiUrl = config.apiUrl.replace(/\/$/, ''); // Remove trailing slash
+    this.apiUrl = config.apiUrl.replace(/\/$/, ""); // Remove trailing slash
     this.apiKey = config.apiKey;
     this.projectSecret = config.projectSecret;
     this.maxRetries = config.maxRetries ?? 3;
     this.retryDelay = config.retryDelay ?? 1000;
     this.maxRetryDelay = config.maxRetryDelay ?? 10000;
     this.timeout = config.timeout ?? 5000;
-    this.enableSecurity = config.enableSecurity !== false && Boolean(this.projectSecret);
-    this.sdkVersion = config.sdkVersion ?? '0.1.0';
+    this.enableSecurity =
+      config.enableSecurity !== false && Boolean(this.projectSecret);
+    this.sdkVersion = config.sdkVersion ?? "0.1.0";
 
     // Set up network connectivity monitoring
     this.setupConnectivityMonitoring();
 
     // Warn if security is disabled but projectSecret is provided
     if (this.projectSecret && !this.enableSecurity) {
-      console.warn('TinyIT SDK: Project secret provided but security is disabled. Consider enabling security for better protection.');
+      console.warn(
+        "TinyIT SDK: Project secret provided but security is disabled. Consider enabling security for better protection.",
+      );
     }
   }
 
@@ -94,7 +97,7 @@ export class TinyITClient {
   async send(endpoint: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
       const queuedRequest: QueuedRequest = {
-        endpoint: endpoint.startsWith('/') ? endpoint : `/${endpoint}`,
+        endpoint: endpoint.startsWith("/") ? endpoint : `/${endpoint}`,
         data,
         timestamp: Date.now(),
         retryCount: 0,
@@ -115,12 +118,13 @@ export class TinyITClient {
    */
   private async processQueue(): Promise<void> {
     if (this.isSending) return;
-    
+    if (!this.isOnline) return;
+
     this.isSending = true;
 
     while (this.queue.length > 0) {
       const request = this.queue[0];
-      
+
       if (!request) {
         this.queue.shift();
         continue;
@@ -132,7 +136,7 @@ export class TinyITClient {
         this.queue.shift(); // Remove successful request from queue
       } catch (error) {
         const shouldRetry = await this.handleRequestError(request, error);
-        
+
         if (!shouldRetry) {
           request.reject(error);
           this.queue.shift(); // Remove failed request from queue
@@ -149,21 +153,26 @@ export class TinyITClient {
    */
   private async executeRequest(request: QueuedRequest): Promise<AxiosResponse> {
     const url = `${this.apiUrl}${request.endpoint}`;
-    
+
     // Prepare headers
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'x-api-key': this.apiKey,
-      'x-tinyit-sdk-version': this.sdkVersion,
+      "Content-Type": "application/json",
+      "x-api-key": this.apiKey,
+      "x-tinyit-sdk-version": this.sdkVersion,
     };
 
     // Add security headers if enabled
     if (this.enableSecurity && this.projectSecret) {
       try {
-        const securityHeaders = createSecureHeaders(request.data, this.projectSecret);
+        const securityHeaders = createSecureHeaders(
+          request.data,
+          this.projectSecret,
+        );
         Object.assign(headers, securityHeaders);
       } catch (error) {
-        throw new Error(`Failed to create security headers: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to create security headers: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
       }
     }
 
@@ -182,33 +191,40 @@ export class TinyITClient {
   /**
    * Handle request errors and determine retry strategy
    */
-  private async handleRequestError(request: QueuedRequest, error: any): Promise<boolean> {
+  private async handleRequestError(
+    request: QueuedRequest,
+    error: any,
+  ): Promise<boolean> {
     const isNetworkError = this.isNetworkError(error);
     const isRetryableError = this.isRetryableError(error);
-    
+
     // Update online status based on error type
     if (isNetworkError) {
       this.isOnline = false;
     }
 
     // Check if we should retry
-    const shouldRetry = (isNetworkError || isRetryableError) && 
-                       request.retryCount < this.maxRetries;
+    const shouldRetry =
+      (isNetworkError || isRetryableError) &&
+      request.retryCount < this.maxRetries;
 
     if (shouldRetry) {
       request.retryCount++;
       const delay = this.calculateRetryDelay(request.retryCount);
-      
-      console.warn(`TinyIT SDK: Request failed, retrying in ${delay}ms (attempt ${request.retryCount}/${this.maxRetries})`, {
-        endpoint: request.endpoint,
-        error: error.message || error,
-        retryCount: request.retryCount,
-      });
+
+      console.warn(
+        `TinyIT SDK: Request failed, retrying in ${delay}ms (attempt ${request.retryCount}/${this.maxRetries})`,
+        {
+          endpoint: request.endpoint,
+          error: error.message || error,
+          retryCount: request.retryCount,
+        },
+      );
 
       await this.sleep(delay);
       return true; // Retry
     } else {
-      console.error('TinyIT SDK: Request failed after all retry attempts', {
+      console.error("TinyIT SDK: Request failed after all retry attempts", {
         endpoint: request.endpoint,
         error: error.message || error,
         retryCount: request.retryCount,
@@ -231,21 +247,25 @@ export class TinyITClient {
    */
   private isNetworkError(error: any): boolean {
     if (!error) return false;
-    
+
     const axiosError = error as AxiosError;
-    
+
     // Network connectivity issues
-    if (axiosError.code === 'ENOTFOUND' || 
-        axiosError.code === 'ECONNREFUSED' ||
-        axiosError.code === 'ECONNRESET' ||
-        axiosError.code === 'ETIMEDOUT' ||
-        axiosError.message?.includes('Network Error')) {
+    if (
+      axiosError.code === "ENOTFOUND" ||
+      axiosError.code === "ECONNREFUSED" ||
+      axiosError.code === "ECONNRESET" ||
+      axiosError.code === "ETIMEDOUT" ||
+      axiosError.message?.includes("Network Error")
+    ) {
       return true;
     }
 
     // Timeout errors
-    if (axiosError.code === 'ECONNABORTED' && 
-        axiosError.message?.includes('timeout')) {
+    if (
+      axiosError.code === "ECONNABORTED" &&
+      axiosError.message?.includes("timeout")
+    ) {
       return true;
     }
 
@@ -278,7 +298,7 @@ export class TinyITClient {
    * Sleep for specified milliseconds
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -286,23 +306,26 @@ export class TinyITClient {
    */
   private setupConnectivityMonitoring(): void {
     // Browser environment detection
-    const isBrowser = typeof globalThis !== 'undefined' && 
-                     'window' in globalThis && 
-                     'navigator' in (globalThis as any).window;
-    
+    const isBrowser =
+      typeof globalThis !== "undefined" &&
+      "window" in globalThis &&
+      "navigator" in (globalThis as any).window;
+
     if (isBrowser) {
       const window = (globalThis as any).window;
-      
-      window.addEventListener('online', () => {
-        console.log('TinyIT SDK: Network connection restored');
+
+      window.addEventListener("online", () => {
+        console.log("TinyIT SDK: Network connection restored");
         this.isOnline = true;
         if (this.queue.length > 0 && !this.isSending) {
           this.processQueue();
         }
       });
 
-      window.addEventListener('offline', () => {
-        console.log('TinyIT SDK: Network connection lost, requests will be queued');
+      window.addEventListener("offline", () => {
+        console.log(
+          "TinyIT SDK: Network connection lost, requests will be queued",
+        );
         this.isOnline = false;
       });
 
@@ -320,7 +343,7 @@ export class TinyITClient {
     isOnline: boolean;
     isSending: boolean;
     queueLength: number;
-    config: Omit<TinyITClientConfig, 'apiKey' | 'projectSecret'> & {
+    config: Omit<TinyITClientConfig, "apiKey" | "projectSecret"> & {
       hasApiKey: boolean;
       hasProjectSecret: boolean;
       securityEnabled: boolean;
@@ -350,8 +373,8 @@ export class TinyITClient {
    */
   clearQueue(): void {
     const queueLength = this.queue.length;
-    this.queue.forEach(request => {
-      request.reject(new Error('Queue cleared'));
+    this.queue.forEach((request) => {
+      request.reject(new Error("Queue cleared"));
     });
     this.queue = [];
     console.log(`TinyIT SDK: Cleared ${queueLength} requests from queue`);

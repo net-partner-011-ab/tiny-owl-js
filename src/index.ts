@@ -92,14 +92,14 @@ export class EchoNova {
     // Warn if HMAC is disabled but projectSecret is provided
     if (this.projectSecret && !this.enableHMAC) {
       console.warn(
-        "TinyOwl SDK: Project secret provided but HMAC verification is disabled. Consider enabling HMAC for better security."
+        "TinyOwl SDK: Project secret provided but HMAC verification is disabled. Consider enabling HMAC for better security.",
       );
     }
 
     // Warn if HMAC is requested but no projectSecret is provided
     if (config.enableHMAC && !this.projectSecret) {
       console.warn(
-        "TinyOwl SDK: HMAC verification requested but no project secret provided. Falling back to legacy authentication."
+        "TinyOwl SDK: HMAC verification requested but no project secret provided. Falling back to legacy authentication.",
       );
       this.enableHMAC = false;
     }
@@ -119,7 +119,7 @@ export class EchoNova {
 
     if (!validSeverities.includes(severity)) {
       throw new Error(
-        `Invalid severity. Must be one of: ${validSeverities.join(", ")}`
+        `Invalid severity. Must be one of: ${validSeverities.join(", ")}`,
       );
     }
 
@@ -148,14 +148,14 @@ export class EchoNova {
 
         const securityHeaders = createSecureHeaders(
           payloadForSignature,
-          this.projectSecret
+          this.projectSecret,
         );
         Object.assign(headers, securityHeaders);
       } catch (error) {
         throw new Error(
           `Failed to create security headers: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`
+          }`,
         );
       }
     }
@@ -180,7 +180,7 @@ export class EchoNova {
       // Handle non-2xx responses
       if (!response.ok) {
         throw new Error(
-          data.message || `HTTP ${response.status}: ${response.statusText}`
+          data.message || `HTTP ${response.status}: ${response.statusText}`,
         );
       }
 
@@ -203,7 +203,7 @@ export class EchoNova {
    */
   async info(
     message: string,
-    context: Record<string, any> = {}
+    context: Record<string, any> = {},
   ): Promise<LogResponse> {
     return this.log(message, { severity: "info", context });
   }
@@ -213,7 +213,7 @@ export class EchoNova {
    */
   async warning(
     message: string,
-    context: Record<string, any> = {}
+    context: Record<string, any> = {},
   ): Promise<LogResponse> {
     return this.log(message, { severity: "warning", context });
   }
@@ -223,7 +223,7 @@ export class EchoNova {
    */
   async error(
     message: string,
-    context: Record<string, any> = {}
+    context: Record<string, any> = {},
   ): Promise<LogResponse> {
     return this.log(message, { severity: "error", context });
   }
@@ -275,7 +275,7 @@ export interface TinyITConfig {
  *
  * @example
  * ```typescript
- * import { initTinyIT } from "@tinyOwlJs/observability";
+ * import { initTinyIT } from "@tiny-owl-kit/observability";
  *
  * const tinyit = initTinyIT({
  *   apiUrl: "https://api.tinyit.io",
@@ -337,6 +337,9 @@ export {
   TinyITClient,
   type TinyITClientConfig,
 } from "./client.js";
+
+// TinyOwl is the canonical public alias for EchoNova
+export { EchoNova as TinyOwl };
 
 // Support both named and default exports for backward compatibility
 export default EchoNova;
