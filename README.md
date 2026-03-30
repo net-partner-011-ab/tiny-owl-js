@@ -510,5 +510,5 @@ For issues and questions:
 
 ---
 
-**Version**: 1.2.1  
+**Version**: 1.2.2  
 **Last Updated**: March 30, 2026
