@@ -29,7 +29,7 @@ You need two credentials from the TinyOwl dashboard:
 # .env
 TINYOWL_API_KEY=your_api_key_here
 TINYOWL_PROJECT_SECRET=your_project_secret_here
-TINYOWL_BASE_URL=https://api.tinyowl.com   # or http://localhost:5001/api for local dev
+TINYOWL_BASE_URL=https://be.tiny-owl-kit.io   # or http://localhost:5001/api for local dev
 ```
 
 **Never hardcode credentials in source code.** Always read from environment variables.
