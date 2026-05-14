@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-05-14
+
+### Fixed
+
+- Corrected `exports` map in `package.json`: `import` condition now points to the ESM build (`dist/index.js`) which actually exists in the published package
+- Corrected `exports` map: `require` condition now points to the CJS build (`dist/index.cjs`) instead of the ESM file, fixing `Dynamic require is not supported` crash in webpack 5 / Next.js projects
+- Fixed `main` field to reference the CJS build (`dist/index.cjs`) for legacy tooling compatibility
+- Fixed `module` field to reference the existing ESM build (`dist/index.js`) instead of the missing `dist/index.mjs`
+- Added explicit `types` per export condition (`dist/index.d.ts` for ESM, `dist/index.d.cts` for CJS) for correct TypeScript resolution in dual-package setups
+
 ### Added
 
 - Comprehensive npm publishing guide in README
