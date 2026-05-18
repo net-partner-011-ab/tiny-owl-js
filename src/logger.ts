@@ -1,11 +1,11 @@
 /**
  * Task 5.4: Log Method Implementation
- * 
+ *
  * TinyITLogger provides simple logging methods with automatic client handling.
  * Supports info, error, and warn severity levels with optional metadata.
  */
 
-import { TinyITClient, type TinyITClientConfig } from './client.js';
+import { TinyITClient, type TinyITClientConfig } from "./client.js";
 
 /**
  * Log entry metadata interface
@@ -17,7 +17,7 @@ export interface LogMetadata {
 /**
  * Log levels supported by TinyIT
  */
-export type LogLevel = 'info' | 'error' | 'warn';
+export type LogLevel = "info" | "error" | "warn";
 
 /**
  * Configuration for TinyITLogger
@@ -30,7 +30,9 @@ export interface TinyITLoggerConfig {
   /** Project secret for HMAC signing (optional, enables security) */
   projectSecret?: string | undefined;
   /** Additional client configuration options */
-  clientConfig?: Partial<Omit<TinyITClientConfig, 'apiUrl' | 'apiKey' | 'projectSecret'>>;
+  clientConfig?: Partial<
+    Omit<TinyITClientConfig, "apiUrl" | "apiKey" | "projectSecret">
+  >;
 }
 
 /**
@@ -44,7 +46,9 @@ export class TinyITLogger {
     const clientConfig: TinyITClientConfig = {
       apiUrl: config.apiUrl,
       apiKey: config.apiKey,
-      ...(config.projectSecret !== undefined && { projectSecret: config.projectSecret }),
+      ...(config.projectSecret !== undefined && {
+        projectSecret: config.projectSecret,
+      }),
       ...config.clientConfig,
     };
 
@@ -58,7 +62,7 @@ export class TinyITLogger {
    * @returns Promise that resolves when the log is sent
    */
   async info(message: string, meta: LogMetadata = {}): Promise<any> {
-    return this.log('info', message, meta);
+    return this.log("info", message, meta);
   }
 
   /**
@@ -68,7 +72,7 @@ export class TinyITLogger {
    * @returns Promise that resolves when the log is sent
    */
   async error(message: string, meta: LogMetadata = {}): Promise<any> {
-    return this.log('error', message, meta);
+    return this.log("error", message, meta);
   }
 
   /**
@@ -78,7 +82,7 @@ export class TinyITLogger {
    * @returns Promise that resolves when the log is sent
    */
   async warn(message: string, meta: LogMetadata = {}): Promise<any> {
-    return this.log('warn', message, meta);
+    return this.log("warn", message, meta);
   }
 
   /**
@@ -88,14 +92,18 @@ export class TinyITLogger {
    * @param meta - Optional metadata
    * @returns Promise that resolves when the log is sent
    */
-  private async log(level: LogLevel, message: string, meta: LogMetadata): Promise<any> {
+  private async log(
+    level: LogLevel,
+    message: string,
+    meta: LogMetadata,
+  ): Promise<any> {
     // Validate inputs
-    if (!message || typeof message !== 'string') {
-      throw new Error('Log message is required and must be a string');
+    if (!message || typeof message !== "string") {
+      throw new Error("Log message is required and must be a string");
     }
 
-    if (typeof meta !== 'object' || meta === null) {
-      throw new Error('Log metadata must be an object');
+    if (typeof meta !== "object" || meta === null) {
+      throw new Error("Log metadata must be an object");
     }
 
     // Prepare log payload
@@ -108,13 +116,13 @@ export class TinyITLogger {
 
     try {
       // Send via client (which handles queuing, retries, etc.)
-      return await this.client.send('/logs', logPayload);
+      return await this.client.send("/ingest", logPayload);
     } catch (error) {
       // Enhanced error handling with context
       const logError = new Error(
-        `Failed to send ${level} log: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to send ${level} log: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
-      
+
       // Add context to error for debugging
       (logError as any).context = {
         level,
@@ -143,10 +151,10 @@ export class TinyITLogger {
     logger: {
       ready: boolean;
     };
-    client: ReturnType<TinyITClient['getStatus']>;
+    client: ReturnType<TinyITClient["getStatus"]>;
   } {
     const clientStatus = this.client.getStatus();
-    
+
     return {
       logger: {
         ready: Boolean(clientStatus.config.hasApiKey),
@@ -185,9 +193,9 @@ export class TinyITLogger {
  * @returns TinyITLogger instance
  */
 export function createLogger(
-  apiUrl: string, 
-  apiKey: string, 
-  projectSecret?: string | undefined
+  apiUrl: string,
+  apiKey: string,
+  projectSecret?: string | undefined,
 ): TinyITLogger {
   return new TinyITLogger({
     apiUrl,

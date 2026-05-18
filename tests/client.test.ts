@@ -7,7 +7,9 @@ import { jest } from "@jest/globals";
 import { TinyITClient } from "../src/client.js";
 import { TinyITLogger } from "../src/logger.js";
 
-const mockFetch = globalThis.fetch as jest.Mock;
+const mockFetch = globalThis.fetch as jest.MockedFunction<
+  (...args: any[]) => Promise<any>
+>;
 
 describe("TinyITClient", () => {
   let client: InstanceType<typeof TinyITClient>;
@@ -202,7 +204,10 @@ describe("TinyITClient", () => {
       mockFetch
         .mockRejectedValueOnce(networkError)
         .mockRejectedValueOnce(networkError)
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true }),
+        });
 
       const result = await client.send("/test", { message: "retry test" });
 
@@ -211,12 +216,20 @@ describe("TinyITClient", () => {
     });
 
     it("should retry on 5xx server errors", async () => {
-      const serverError = { ok: false, status: 500, statusText: "Internal Server Error", json: async () => ({}) };
+      const serverError = {
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        json: async () => ({}),
+      };
 
       mockFetch
         .mockResolvedValueOnce(serverError)
         .mockResolvedValueOnce(serverError)
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true }),
+        });
 
       const result = await client.send("/test", {
         message: "server error test",
@@ -227,11 +240,17 @@ describe("TinyITClient", () => {
     });
 
     it("should retry on rate limiting (429)", async () => {
-      const rateLimitResponse = { ok: false, status: 429, statusText: "Too Many Requests", json: async () => ({}) };
+      const rateLimitResponse = {
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        json: async () => ({}),
+      };
 
-      mockFetch
-        .mockResolvedValueOnce(rateLimitResponse)
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
+      mockFetch.mockResolvedValueOnce(rateLimitResponse).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
 
       const result = await client.send("/test", { message: "rate limit test" });
 
@@ -240,7 +259,12 @@ describe("TinyITClient", () => {
     });
 
     it("should not retry on 4xx client errors (except 429)", async () => {
-      mockFetch.mockResolvedValueOnce({ ok: false, status: 400, statusText: "Bad Request", json: async () => ({}) });
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        json: async () => ({}),
+      });
 
       await expect(
         client.send("/test", { message: "client error test" }),
@@ -269,7 +293,10 @@ describe("TinyITClient", () => {
       mockFetch
         .mockRejectedValueOnce(networkError)
         .mockRejectedValueOnce(networkError)
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true }),
+        });
 
       await client.send("/test", { message: "backoff test" });
 
@@ -341,7 +368,10 @@ describe("TinyITClient", () => {
     });
 
     it("should handle timeout errors", async () => {
-      const timeoutError = new DOMException("Request timeout exceeded", "TimeoutError");
+      const timeoutError = new DOMException(
+        "Request timeout exceeded",
+        "TimeoutError",
+      );
 
       mockFetch.mockRejectedValue(timeoutError);
 

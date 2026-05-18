@@ -110,7 +110,7 @@ describe("Browser Environment Compatibility", () => {
       await tinyit.info("Browser fetch test");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.test.com/logs",
+        "https://api.test.com/ingest",
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({

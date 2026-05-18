@@ -103,7 +103,7 @@ describe("TinyITLogger", () => {
 
       await logger.info(message, meta);
 
-      expect(mockClient.send).toHaveBeenCalledWith("/logs", {
+      expect(mockClient.send).toHaveBeenCalledWith("/ingest", {
         level: "info",
         message,
         meta,
@@ -117,7 +117,7 @@ describe("TinyITLogger", () => {
 
       await logger.error(message, meta);
 
-      expect(mockClient.send).toHaveBeenCalledWith("/logs", {
+      expect(mockClient.send).toHaveBeenCalledWith("/ingest", {
         level: "error",
         message,
         meta,
@@ -131,7 +131,7 @@ describe("TinyITLogger", () => {
 
       await logger.warn(message, meta);
 
-      expect(mockClient.send).toHaveBeenCalledWith("/logs", {
+      expect(mockClient.send).toHaveBeenCalledWith("/ingest", {
         level: "warn",
         message,
         meta,
@@ -142,7 +142,7 @@ describe("TinyITLogger", () => {
     it("should handle empty metadata", async () => {
       await logger.info("Test message");
 
-      expect(mockClient.send).toHaveBeenCalledWith("/logs", {
+      expect(mockClient.send).toHaveBeenCalledWith("/ingest", {
         level: "info",
         message: "Test message",
         meta: {},
@@ -311,22 +311,22 @@ describe("TinyITLogger", () => {
       expect(mockClient.send).toHaveBeenCalledTimes(4);
       expect(mockClient.send).toHaveBeenNthCalledWith(
         1,
-        "/logs",
+        "/ingest",
         expect.objectContaining({ level: "info", message: "Message 1" }),
       );
       expect(mockClient.send).toHaveBeenNthCalledWith(
         2,
-        "/logs",
+        "/ingest",
         expect.objectContaining({ level: "error", message: "Message 2" }),
       );
       expect(mockClient.send).toHaveBeenNthCalledWith(
         3,
-        "/logs",
+        "/ingest",
         expect.objectContaining({ level: "warn", message: "Message 3" }),
       );
       expect(mockClient.send).toHaveBeenNthCalledWith(
         4,
-        "/logs",
+        "/ingest",
         expect.objectContaining({ level: "info", message: "Message 4" }),
       );
     });

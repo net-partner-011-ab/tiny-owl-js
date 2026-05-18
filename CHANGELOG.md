@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.5] - Unreleased
+
 ## [1.2.4] - 2026-05-18
 
 ### Fixed
@@ -17,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HTTP 5xx / 429 errors detected through response `ok: false` + status code — retry logic unchanged
 - Bundle size reduced from ~436 KB to a few KB (axios + form-data + combined-stream removed)
 - Removed `axios` from `devDependencies`
+- Fixed `TinyITLogger` sending requests to wrong endpoint `/logs` instead of `/ingest` — would have caused 404 errors against the backend for all users of `initTinyIT()`
 
 ## [1.2.3] - 2026-05-14
 

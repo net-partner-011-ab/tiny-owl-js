@@ -6,7 +6,9 @@
 import { jest } from "@jest/globals";
 import { initTinyIT, TinyITLogger } from "../src/index.js";
 
-const mockFetch = globalThis.fetch as jest.Mock;
+const mockFetch = globalThis.fetch as jest.MockedFunction<
+  (...args: any[]) => Promise<any>
+>;
 
 describe("initTinyIT Integration", () => {
   const validConfig = {
@@ -163,7 +165,7 @@ describe("End-to-End Integration", () => {
     await tinyit.info("Integration test message", { testId: "123" });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.test.com/logs",
+      "https://api.test.com/ingest",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
@@ -181,9 +183,10 @@ describe("End-to-End Integration", () => {
 
   it("should handle network errors with retry", async () => {
     const networkError = new TypeError("Network error");
-    mockFetch
-      .mockRejectedValueOnce(networkError)
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
+    mockFetch.mockRejectedValueOnce(networkError).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
 
     const tinyit = initTinyIT({
       apiUrl: "https://api.test.com",
@@ -288,7 +291,9 @@ describe("Real-World Usage Scenarios", () => {
     expect(mockFetch).toHaveBeenCalledTimes(4);
 
     const calls = mockFetch.mock.calls;
-    const bodies = calls.map((call: any[]) => JSON.parse((call[1] as RequestInit).body as string));
+    const bodies = calls.map((call: any[]) =>
+      JSON.parse((call[1] as RequestInit).body as string),
+    );
 
     expect(bodies[0]?.level).toBe("info");
     expect(bodies[1]?.level).toBe("warn");
