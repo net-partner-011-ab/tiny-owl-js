@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.2.5] - Unreleased
+## [1.2.6] - Unreleased
+
+## [1.2.5] - 2026-05-18
+
+### Fixed
+
+- Fixed incorrect production `baseUrl` in documentation — `TINYOWL_BASE_URL` must include the `/api` suffix (`https://be.tiny-owl-kit.io/api`); missing suffix caused `Route /ingest not found` errors on production backends
+- Updated `README.md` and `tinyowl-sdk.instructions.md` examples to use correct `baseUrl: "https://be.tiny-owl-kit.io/api"`
 
 ## [1.2.4] - 2026-05-18
 

@@ -64,7 +64,7 @@ npm install @tiny-owl-kit/observability
 const client = new TinyOwl({
   apiKey: "YOUR_API_KEY", // Required: Project API key
   projectSecret: "YOUR_PROJECT_SECRET", // Required: For HMAC verification
-  baseUrl: "https://be.tiny-owl-kit.io", // Optional: API endpoint
+  baseUrl: "https://be.tiny-owl-kit.io/api", // Optional: API endpoint
   timeout: 5000, // Optional: Request timeout (ms)
 });
 ```
@@ -354,7 +354,7 @@ const config = client.getConfig();
 console.log(config);
 // Output:
 // {
-//   baseUrl: "https://be.tiny-owl-kit.io",
+//   baseUrl: "https://be.tiny-owl-kit.io/api",
 //   timeout: 5000,
 //   hasApiKey: true,
 //   hasProjectSecret: true,
@@ -510,5 +510,5 @@ For issues and questions:
 
 ---
 
-**Version**: 1.2.2  
-**Last Updated**: March 30, 2026
+**Version**: 1.2.4  
+**Last Updated**: May 18, 2026
