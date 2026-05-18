@@ -4,14 +4,9 @@
  */
 
 import { jest } from "@jest/globals";
+import { initTinyIT } from "../src/index.js";
 
-const mockedPost = jest.fn() as jest.Mock<(...args: any[]) => Promise<any>>;
-const mockedAxios = { post: mockedPost };
-jest.unstable_mockModule("axios", () => ({
-  default: mockedAxios,
-}));
-
-const { initTinyIT } = await import("../src/index.js");
+const mockFetch = globalThis.fetch as jest.Mock;
 
 describe("Browser Environment Compatibility", () => {
   beforeEach(() => {
@@ -102,9 +97,9 @@ describe("Browser Environment Compatibility", () => {
 
   describe("Request Sending", () => {
     it("should send requests to the configured API endpoint", async () => {
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { success: true },
-        status: 200,
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
       });
 
       const tinyit = initTinyIT({
@@ -114,13 +109,10 @@ describe("Browser Environment Compatibility", () => {
 
       await tinyit.info("Browser fetch test");
 
-      expect(mockedAxios.post).toHaveBeenCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         "https://api.test.com/logs",
         expect.objectContaining({
-          level: "info",
-          message: "Browser fetch test",
-        }),
-        expect.objectContaining({
+          method: "POST",
           headers: expect.objectContaining({
             "Content-Type": "application/json",
           }),
@@ -129,7 +121,7 @@ describe("Browser Environment Compatibility", () => {
     });
 
     it("should handle request errors gracefully", async () => {
-      mockedAxios.post.mockRejectedValueOnce(new Error("Network Error"));
+      mockFetch.mockRejectedValueOnce(new Error("Network Error"));
 
       const tinyit = initTinyIT({
         apiUrl: "https://api.test.com",
@@ -145,10 +137,12 @@ describe("Browser Environment Compatibility", () => {
     });
 
     it("should handle server error responses", async () => {
-      const serverError = Object.assign(new Error("Endpoint not found"), {
-        response: { status: 404, data: { message: "Endpoint not found" } },
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        json: async () => ({}),
       });
-      mockedAxios.post.mockRejectedValueOnce(serverError);
 
       const tinyit = initTinyIT({
         apiUrl: "https://api.test.com",
@@ -158,9 +152,7 @@ describe("Browser Environment Compatibility", () => {
         },
       });
 
-      await expect(tinyit.info("404 test")).rejects.toThrow(
-        "Endpoint not found",
-      );
+      await expect(tinyit.info("404 test")).rejects.toThrow("HTTP 404");
     });
   });
 
@@ -185,9 +177,9 @@ describe("Browser Environment Compatibility", () => {
 
       (global as any).window = mockWindow;
 
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { success: true },
-        status: 200,
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
       });
 
       const tinyit = initTinyIT({
@@ -202,8 +194,8 @@ describe("Browser Environment Compatibility", () => {
         screenResolution: `${mockWindow.screen.width}x${mockWindow.screen.height}`,
       });
 
-      const callArgs = mockedAxios.post.mock.calls[0];
-      const body = callArgs?.[1] as any;
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse((callArgs?.[1] as RequestInit).body as string);
 
       expect(body.meta.userAgent).toBe("Mozilla/5.0 (Test Browser)");
       expect(body.meta.language).toBe("en-US");
@@ -224,9 +216,9 @@ describe("Browser Environment Compatibility", () => {
       (global as any).localStorage = mockStorage;
       (global as any).sessionStorage = mockStorage;
 
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { success: true },
-        status: 200,
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
       });
 
       const tinyit = initTinyIT({
@@ -251,9 +243,9 @@ describe("Browser Environment Compatibility", () => {
 
       (global as any).performance = mockPerformance;
 
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { success: true },
-        status: 200,
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
       });
 
       const tinyit = initTinyIT({
@@ -270,9 +262,9 @@ describe("Browser Environment Compatibility", () => {
     it("should fallback gracefully without performance API", async () => {
       delete (global as any).performance;
 
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { success: true },
-        status: 200,
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
       });
 
       const tinyit = initTinyIT({
@@ -289,7 +281,7 @@ describe("Browser Environment Compatibility", () => {
   describe("Error Handling in Browser", () => {
     it("should handle browser-specific errors", async () => {
       const browserError = new Error("SecurityError: Blocked by CORS policy");
-      mockedAxios.post.mockRejectedValueOnce(browserError);
+      mockFetch.mockRejectedValueOnce(browserError);
 
       const tinyit = initTinyIT({
         apiUrl: "https://api.test.com",
@@ -308,7 +300,7 @@ describe("Browser Environment Compatibility", () => {
       const quotaError = new Error(
         "QuotaExceededError: The quota has been exceeded",
       );
-      mockedAxios.post.mockRejectedValueOnce(quotaError);
+      mockFetch.mockRejectedValueOnce(quotaError);
 
       const tinyit = initTinyIT({
         apiUrl: "https://api.test.com",
@@ -343,12 +335,12 @@ describe("Browser Environment Compatibility", () => {
       const logPromise = tinyit.info("Offline test");
 
       // Should not send while offline
-      expect(mockedAxios.post).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
 
       // Set up response before going online so the queued request resolves
-      mockedAxios.post.mockResolvedValueOnce({
-        data: { success: true },
-        status: 200,
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
       });
 
       // Simulate going online
@@ -363,7 +355,7 @@ describe("Browser Environment Compatibility", () => {
 
       await logPromise;
 
-      expect(mockedAxios.post).toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalled();
     });
   });
 });

@@ -8,8 +8,21 @@
  * - Security header integration
  */
 
-import axios, { type AxiosError, type AxiosResponse } from "axios";
-import { createSecureHeaders, type SecurityHeaders } from "./security.js";
+import { createSecureHeaders } from "./security.js";
+
+/**
+ * Internal error class for non-OK HTTP responses.
+ * Carries the HTTP status code so the retry logic can decide whether to retry.
+ */
+class FetchError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "FetchError";
+    this.status = status;
+  }
+}
 
 /**
  * Configuration options for TinyITClient
@@ -131,8 +144,8 @@ export class TinyITClient {
       }
 
       try {
-        const response = await this.executeRequest(request);
-        request.resolve(response.data);
+        const data = await this.executeRequest(request);
+        request.resolve(data);
         this.queue.shift(); // Remove successful request from queue
       } catch (error) {
         const shouldRetry = await this.handleRequestError(request, error);
@@ -149,9 +162,9 @@ export class TinyITClient {
   }
 
   /**
-   * Execute a single HTTP request
+   * Execute a single HTTP request using the native fetch API
    */
-  private async executeRequest(request: QueuedRequest): Promise<AxiosResponse> {
+  private async executeRequest(request: QueuedRequest): Promise<any> {
     const url = `${this.apiUrl}${request.endpoint}`;
 
     // Prepare headers
@@ -176,16 +189,21 @@ export class TinyITClient {
       }
     }
 
-    // Execute request with axios
-    return axios.post(url, request.data, {
+    const response = await fetch(url, {
+      method: "POST",
       headers,
-      timeout: this.timeout,
-      // Add retry-specific metadata
-      metadata: {
-        retryCount: request.retryCount,
-        queuedAt: request.timestamp,
-      },
-    } as any);
+      body: JSON.stringify(request.data),
+      signal: AbortSignal.timeout(this.timeout),
+    });
+
+    if (!response.ok) {
+      throw new FetchError(
+        `HTTP ${response.status}: ${response.statusText}`,
+        response.status,
+      );
+    }
+
+    return response.json();
   }
 
   /**
@@ -243,32 +261,17 @@ export class TinyITClient {
   }
 
   /**
-   * Check if error is a network connectivity issue
+   * Check if error is a network connectivity issue.
+   * fetch() throws TypeError for network failures and DOMException (name="TimeoutError")
+   * when an AbortSignal.timeout() fires.
    */
   private isNetworkError(error: any): boolean {
     if (!error) return false;
-
-    const axiosError = error as AxiosError;
-
-    // Network connectivity issues
-    if (
-      axiosError.code === "ENOTFOUND" ||
-      axiosError.code === "ECONNREFUSED" ||
-      axiosError.code === "ECONNRESET" ||
-      axiosError.code === "ETIMEDOUT" ||
-      axiosError.message?.includes("Network Error")
-    ) {
+    // TypeError is thrown by fetch on network failures (DNS, refused connections, etc.)
+    if (error instanceof TypeError) return true;
+    // DOMException with TimeoutError name is thrown by AbortSignal.timeout()
+    if (error instanceof DOMException && error.name === "TimeoutError")
       return true;
-    }
-
-    // Timeout errors
-    if (
-      axiosError.code === "ECONNABORTED" &&
-      axiosError.message?.includes("timeout")
-    ) {
-      return true;
-    }
-
     return false;
   }
 
@@ -276,21 +279,12 @@ export class TinyITClient {
    * Check if error is retryable (5xx server errors, rate limits)
    */
   private isRetryableError(error: any): boolean {
-    const axiosError = error as AxiosError;
-    const status = axiosError.response?.status;
-
-    if (!status) return false;
-
+    if (!(error instanceof FetchError)) return false;
+    const { status } = error;
     // Server errors (5xx)
-    if (status >= 500 && status < 600) {
-      return true;
-    }
-
+    if (status >= 500 && status < 600) return true;
     // Rate limiting (429)
-    if (status === 429) {
-      return true;
-    }
-
+    if (status === 429) return true;
     return false;
   }
 

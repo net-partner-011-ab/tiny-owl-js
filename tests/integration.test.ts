@@ -4,14 +4,10 @@
  */
 
 import { jest } from "@jest/globals";
+import { initTinyIT, TinyITLogger } from "../src/index.js";
 
-const mockedPost = jest.fn() as jest.Mock<(...args: any[]) => Promise<any>>;
-const mockedAxios = { post: mockedPost };
-jest.unstable_mockModule("axios", () => ({
-  default: mockedAxios,
-}));
+const mockFetch = globalThis.fetch as jest.Mock;
 
-const { initTinyIT, TinyITLogger } = await import("../src/index.js");
 describe("initTinyIT Integration", () => {
   const validConfig = {
     apiUrl: "https://api.test.com",
@@ -153,9 +149,9 @@ describe("End-to-End Integration", () => {
   });
 
   it("should handle complete logging flow", async () => {
-    mockedAxios.post.mockResolvedValueOnce({
-      data: { success: true, eventId: "evt_123" },
-      status: 200,
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, eventId: "evt_123" }),
     });
 
     const tinyit = initTinyIT({
@@ -166,15 +162,10 @@ describe("End-to-End Integration", () => {
 
     await tinyit.info("Integration test message", { testId: "123" });
 
-    expect(mockedAxios.post).toHaveBeenCalledWith(
+    expect(mockFetch).toHaveBeenCalledWith(
       "https://api.test.com/logs",
       expect.objectContaining({
-        level: "info",
-        message: "Integration test message",
-        meta: { testId: "123" },
-        timestamp: expect.any(String),
-      }),
-      expect.objectContaining({
+        method: "POST",
         headers: expect.objectContaining({
           "Content-Type": "application/json",
           "x-api-key": "test-key",
@@ -183,17 +174,16 @@ describe("End-to-End Integration", () => {
           "x-timestamp": expect.any(String),
           "x-nonce": expect.any(String),
         }),
+        body: expect.stringContaining('"message":"Integration test message"'),
       }),
     );
   });
 
   it("should handle network errors with retry", async () => {
-    const networkError = Object.assign(new Error("Network error"), {
-      code: "ENOTFOUND",
-    });
-    mockedAxios.post
+    const networkError = new TypeError("Network error");
+    mockFetch
       .mockRejectedValueOnce(networkError)
-      .mockResolvedValueOnce({ data: { success: true }, status: 200 });
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
     const tinyit = initTinyIT({
       apiUrl: "https://api.test.com",
@@ -206,13 +196,13 @@ describe("End-to-End Integration", () => {
 
     await tinyit.error("Network error test", { retry: true });
 
-    expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it("should work without project secret (legacy mode)", async () => {
-    mockedAxios.post.mockResolvedValueOnce({
-      data: { success: true },
-      status: 200,
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true }),
     });
 
     const tinyit = initTinyIT({
@@ -222,10 +212,9 @@ describe("End-to-End Integration", () => {
 
     await tinyit.warn("Legacy mode test");
 
-    const callArgs = mockedAxios.post.mock.calls[0];
-    const headers = callArgs?.[2]?.headers as
-      | Record<string, string>
-      | undefined;
+    const callArgs = mockFetch.mock.calls[0];
+    const init = callArgs?.[1] as RequestInit;
+    const headers = init?.headers as Record<string, string> | undefined;
 
     expect(headers?.["x-signature"]).toBeUndefined();
     expect(headers?.["x-timestamp"]).toBeUndefined();
@@ -235,10 +224,12 @@ describe("End-to-End Integration", () => {
   });
 
   it("should handle server errors appropriately", async () => {
-    const serverError = Object.assign(new Error("Server error"), {
-      response: { status: 500, data: { message: "Server error" } },
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: "Internal Server Error",
+      json: async () => ({}),
     });
-    mockedAxios.post.mockRejectedValueOnce(serverError);
 
     const tinyit = initTinyIT({
       apiUrl: "https://api.test.com",
@@ -248,9 +239,7 @@ describe("End-to-End Integration", () => {
       },
     });
 
-    await expect(tinyit.info("Server error test")).rejects.toThrow(
-      "Server error",
-    );
+    await expect(tinyit.info("Server error test")).rejects.toThrow("HTTP 500");
   });
 });
 
@@ -260,9 +249,9 @@ describe("Real-World Usage Scenarios", () => {
   });
 
   it("should handle high-frequency logging", async () => {
-    mockedAxios.post.mockResolvedValue({
-      data: { success: true },
-      status: 200,
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
     });
 
     const tinyit = initTinyIT({
@@ -277,13 +266,13 @@ describe("Real-World Usage Scenarios", () => {
 
     await Promise.all(promises);
 
-    expect(mockedAxios.post).toHaveBeenCalledTimes(20);
+    expect(mockFetch).toHaveBeenCalledTimes(20);
   });
 
   it("should handle mixed log levels appropriately", async () => {
-    mockedAxios.post.mockResolvedValue({
-      data: { success: true },
-      status: 200,
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
     });
 
     const tinyit = initTinyIT({
@@ -296,10 +285,10 @@ describe("Real-World Usage Scenarios", () => {
     await tinyit.error("Database connection failed", { error: "ECONNREFUSED" });
     await tinyit.info("Retrying database connection");
 
-    expect(mockedAxios.post).toHaveBeenCalledTimes(4);
+    expect(mockFetch).toHaveBeenCalledTimes(4);
 
-    const calls = mockedAxios.post.mock.calls;
-    const bodies = calls.map((call: any[]) => call[1] as any);
+    const calls = mockFetch.mock.calls;
+    const bodies = calls.map((call: any[]) => JSON.parse((call[1] as RequestInit).body as string));
 
     expect(bodies[0]?.level).toBe("info");
     expect(bodies[1]?.level).toBe("warn");
@@ -308,9 +297,9 @@ describe("Real-World Usage Scenarios", () => {
   });
 
   it("should handle complex metadata structures", async () => {
-    mockedAxios.post.mockResolvedValue({
-      data: { success: true },
-      status: 200,
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true }),
     });
 
     const tinyit = initTinyIT({
@@ -345,8 +334,8 @@ describe("Real-World Usage Scenarios", () => {
 
     await tinyit.info("Complex metadata test", complexMeta);
 
-    const callArgs = mockedAxios.post.mock.calls[0];
-    const body = callArgs?.[1] as any;
+    const callArgs = mockFetch.mock.calls[0];
+    const body = JSON.parse((callArgs?.[1] as RequestInit).body as string);
 
     expect(body.meta).toEqual(complexMeta);
   });

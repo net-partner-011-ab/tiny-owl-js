@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-05-18
+
+### Fixed
+
+- Replaced `axios` (CJS-only dependency chain) with the native `fetch` API, eliminating the `__require` CJS shim that `tsup` injected into the ESM bundle (`dist/index.js`)
+- Resolved `Dynamic require of "util" is not supported` crash that occurred during Next.js "Collecting page data" phase when the ESM entry point was loaded by Node.js's native ESM loader (not webpack)
+- Network errors are now detected via `TypeError` (fetch standard) and `DOMException` with `name === "TimeoutError"` (AbortSignal.timeout standard)
+- HTTP 5xx / 429 errors detected through response `ok: false` + status code — retry logic unchanged
+- Bundle size reduced from ~436 KB to a few KB (axios + form-data + combined-stream removed)
+- Removed `axios` from `devDependencies`
+
 ## [1.2.3] - 2026-05-14
 
 ### Fixed

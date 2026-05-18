@@ -4,15 +4,10 @@
  */
 
 import { jest } from "@jest/globals";
+import { TinyITClient } from "../src/client.js";
+import { TinyITLogger } from "../src/logger.js";
 
-const mockedPost = jest.fn() as jest.Mock<(...args: any[]) => Promise<any>>;
-const mockedAxios = { post: mockedPost };
-jest.unstable_mockModule("axios", () => ({
-  default: mockedAxios,
-}));
-
-const { TinyITClient } = await import("../src/client.js");
-const { TinyITLogger } = await import("../src/logger.js");
+const mockFetch = globalThis.fetch as jest.Mock;
 
 describe("TinyITClient", () => {
   let client: InstanceType<typeof TinyITClient>;
@@ -68,20 +63,19 @@ describe("TinyITClient", () => {
 
   describe("API Call Mocking", () => {
     it("should successfully send request when API responds with 200", async () => {
-      const mockResponse = {
-        data: { success: true, eventId: "evt_123" },
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
         status: 200,
-      };
-
-      mockedAxios.post.mockResolvedValueOnce(mockResponse);
+        json: async () => ({ success: true, eventId: "evt_123" }),
+      });
 
       const result = await client.send("/test", { message: "test" });
 
-      expect(result).toEqual(mockResponse.data);
-      expect(mockedAxios.post).toHaveBeenCalledWith(
+      expect(result).toEqual({ success: true, eventId: "evt_123" });
+      expect(mockFetch).toHaveBeenCalledWith(
         "https://api.test.com/test",
-        { message: "test" },
         expect.objectContaining({
+          method: "POST",
           headers: expect.objectContaining({
             "Content-Type": "application/json",
             "x-api-key": "test-api-key",
@@ -90,20 +84,23 @@ describe("TinyITClient", () => {
             "x-timestamp": expect.any(String),
             "x-nonce": expect.any(String),
           }),
-          timeout: 1000,
+          body: JSON.stringify({ message: "test" }),
         }),
       );
     });
 
     it("should include security headers when security is enabled", async () => {
-      const mockResponse = { data: { success: true }, status: 200 };
-      mockedAxios.post.mockResolvedValueOnce(mockResponse);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
 
       await client.send("/test", { message: "secure test" });
 
-      const callArgs = mockedAxios.post.mock.calls[0];
+      const callArgs = mockFetch.mock.calls[0];
       expect(callArgs).toBeDefined();
-      const headers = callArgs![2]?.headers;
+      const init = callArgs![1] as RequestInit;
+      const headers = init?.headers as Record<string, string>;
       expect(headers).toBeDefined();
 
       expect(headers).toHaveProperty("x-signature");
@@ -122,16 +119,19 @@ describe("TinyITClient", () => {
         enableSecurity: false,
       });
 
-      const mockResponse = { data: { success: true }, status: 200 };
-      mockedAxios.post.mockResolvedValueOnce(mockResponse);
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
 
       await clientWithoutSecurity.send("/test", {
         message: "no security test",
       });
 
-      const callArgs = mockedAxios.post.mock.calls[0];
+      const callArgs = mockFetch.mock.calls[0];
       expect(callArgs).toBeDefined();
-      const headers = callArgs![2]?.headers;
+      const init = callArgs![1] as RequestInit;
+      const headers = init?.headers as Record<string, string>;
 
       expect(headers).not.toHaveProperty("x-signature");
       expect(headers).not.toHaveProperty("x-timestamp");
@@ -141,8 +141,10 @@ describe("TinyITClient", () => {
 
   describe("Queue System", () => {
     it("should queue multiple requests and process them sequentially", async () => {
-      const mockResponse = { data: { success: true }, status: 200 };
-      mockedAxios.post.mockResolvedValue(mockResponse);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
 
       const promises = [
         client.send("/test1", { message: "test1" }),
@@ -152,24 +154,21 @@ describe("TinyITClient", () => {
 
       await Promise.all(promises);
 
-      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
-      expect(mockedAxios.post).toHaveBeenNthCalledWith(
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(mockFetch).toHaveBeenNthCalledWith(
         1,
         "https://api.test.com/test1",
-        { message: "test1" },
-        expect.any(Object),
+        expect.objectContaining({ body: JSON.stringify({ message: "test1" }) }),
       );
-      expect(mockedAxios.post).toHaveBeenNthCalledWith(
+      expect(mockFetch).toHaveBeenNthCalledWith(
         2,
         "https://api.test.com/test2",
-        { message: "test2" },
-        expect.any(Object),
+        expect.objectContaining({ body: JSON.stringify({ message: "test2" }) }),
       );
-      expect(mockedAxios.post).toHaveBeenNthCalledWith(
+      expect(mockFetch).toHaveBeenNthCalledWith(
         3,
         "https://api.test.com/test3",
-        { message: "test3" },
-        expect.any(Object),
+        expect.objectContaining({ body: JSON.stringify({ message: "test3" }) }),
       );
     });
 
@@ -182,7 +181,7 @@ describe("TinyITClient", () => {
 
       // Note: In real usage, queue length would decrease as items are processed
       // For testing, we check initial state
-      expect(mockedAxios.post).toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalled();
     });
 
     it("should clear queue when requested", async () => {
@@ -198,93 +197,79 @@ describe("TinyITClient", () => {
 
   describe("Retry Mechanism", () => {
     it("should retry on network errors", async () => {
-      const networkError = new Error("Network Error");
-      (networkError as any).code = "ENOTFOUND";
+      const networkError = new TypeError("Failed to fetch");
 
-      mockedAxios.post
+      mockFetch
         .mockRejectedValueOnce(networkError)
         .mockRejectedValueOnce(networkError)
-        .mockResolvedValueOnce({ data: { success: true }, status: 200 });
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
       const result = await client.send("/test", { message: "retry test" });
 
       expect(result).toEqual({ success: true });
-      expect(mockedAxios.post).toHaveBeenCalledTimes(3); // Initial + 2 retries
+      expect(mockFetch).toHaveBeenCalledTimes(3); // Initial + 2 retries
     });
 
     it("should retry on 5xx server errors", async () => {
-      const serverError = {
-        response: { status: 500 },
-        message: "Internal Server Error",
-      };
+      const serverError = { ok: false, status: 500, statusText: "Internal Server Error", json: async () => ({}) };
 
-      mockedAxios.post
-        .mockRejectedValueOnce(serverError)
-        .mockRejectedValueOnce(serverError)
-        .mockResolvedValueOnce({ data: { success: true }, status: 200 });
+      mockFetch
+        .mockResolvedValueOnce(serverError)
+        .mockResolvedValueOnce(serverError)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
       const result = await client.send("/test", {
         message: "server error test",
       });
 
       expect(result).toEqual({ success: true });
-      expect(mockedAxios.post).toHaveBeenCalledTimes(3);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
     it("should retry on rate limiting (429)", async () => {
-      const rateLimitError = {
-        response: { status: 429 },
-        message: "Too Many Requests",
-      };
+      const rateLimitResponse = { ok: false, status: 429, statusText: "Too Many Requests", json: async () => ({}) };
 
-      mockedAxios.post
-        .mockRejectedValueOnce(rateLimitError)
-        .mockResolvedValueOnce({ data: { success: true }, status: 200 });
+      mockFetch
+        .mockResolvedValueOnce(rateLimitResponse)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
       const result = await client.send("/test", { message: "rate limit test" });
 
       expect(result).toEqual({ success: true });
-      expect(mockedAxios.post).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
     it("should not retry on 4xx client errors (except 429)", async () => {
-      const clientError = {
-        response: { status: 400 },
-        message: "Bad Request",
-      };
-
-      mockedAxios.post.mockRejectedValueOnce(clientError);
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 400, statusText: "Bad Request", json: async () => ({}) });
 
       await expect(
         client.send("/test", { message: "client error test" }),
-      ).rejects.toMatchObject({ message: "Bad Request" });
+      ).rejects.toMatchObject({ message: "HTTP 400: Bad Request" });
 
-      expect(mockedAxios.post).toHaveBeenCalledTimes(1); // No retries
+      expect(mockFetch).toHaveBeenCalledTimes(1); // No retries
     });
 
     it("should fail after maximum retries", async () => {
-      const networkError = new Error("Persistent Network Error");
-      (networkError as any).code = "ENOTFOUND";
+      const networkError = new TypeError("Persistent Network Error");
 
-      mockedAxios.post.mockRejectedValue(networkError);
+      mockFetch.mockRejectedValue(networkError);
 
       await expect(
         client.send("/test", { message: "max retries test" }),
       ).rejects.toMatchObject({ message: "Persistent Network Error" });
 
-      expect(mockedAxios.post).toHaveBeenCalledTimes(4); // Initial + 3 retries
+      expect(mockFetch).toHaveBeenCalledTimes(4); // Initial + 3 retries
     });
 
     it("should use exponential backoff for retry delays", async () => {
-      const networkError = new Error("Network Error");
-      (networkError as any).code = "ETIMEDOUT";
+      const networkError = new TypeError("Network Error");
 
       const startTime = Date.now();
 
-      mockedAxios.post
+      mockFetch
         .mockRejectedValueOnce(networkError)
         .mockRejectedValueOnce(networkError)
-        .mockResolvedValueOnce({ data: { success: true }, status: 200 });
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
 
       await client.send("/test", { message: "backoff test" });
 
@@ -343,9 +328,10 @@ describe("TinyITClient", () => {
 
   describe("Error Handling", () => {
     it("should handle malformed responses gracefully", async () => {
-      mockedAxios.post.mockResolvedValueOnce({
-        data: null,
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
         status: 200,
+        json: async () => null,
       });
 
       const result = await client.send("/test", {
@@ -355,11 +341,9 @@ describe("TinyITClient", () => {
     });
 
     it("should handle timeout errors", async () => {
-      const timeoutError = new Error("Request timeout");
-      (timeoutError as any).code = "ECONNABORTED";
-      (timeoutError as any).message = "timeout of 1000ms exceeded";
+      const timeoutError = new DOMException("Request timeout exceeded", "TimeoutError");
 
-      mockedAxios.post.mockRejectedValue(timeoutError);
+      mockFetch.mockRejectedValue(timeoutError);
 
       await expect(
         client.send("/test", { message: "timeout test" }),
@@ -370,7 +354,7 @@ describe("TinyITClient", () => {
 
     it("should provide detailed error context", async () => {
       const error = new Error("Test error");
-      mockedAxios.post.mockRejectedValue(error);
+      mockFetch.mockRejectedValue(error);
 
       try {
         await client.send("/test", { message: "error context test" });
@@ -402,12 +386,12 @@ describe("TinyITClient", () => {
     it("should track sending state correctly", async () => {
       const slowResponse = new Promise((resolve) =>
         setTimeout(
-          () => resolve({ data: { success: true }, status: 200 }),
+          () => resolve({ ok: true, json: async () => ({ success: true }) }),
           100,
         ),
       );
 
-      mockedAxios.post.mockReturnValueOnce(slowResponse as any);
+      mockFetch.mockReturnValueOnce(slowResponse as any);
 
       const sendPromise = client.send("/test", {
         message: "sending state test",
