@@ -22,6 +22,21 @@ import { TinyITClient, type TinyITClientConfig } from "./client.js";
  */
 export type Severity = "info" | "warning" | "error";
 
+/** Allowed characters for traceId values (mirrored on the backend). */
+const TRACE_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+
+/** Generate a UUID v4 using the Web Crypto API (Node 18+, modern browsers). */
+function newUUID(): string {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  // Minimal fallback for environments without Web Crypto
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 /**
  * Configuration options for TinyOwl client
  */
@@ -36,6 +51,19 @@ export interface EchoNovaConfig {
   timeout?: number;
   /** Enable HMAC signature verification (default: true when projectSecret is provided) */
   enableHMAC?: boolean;
+  /**
+   * Default context fields merged into every log call made on this instance.
+   * Call-site context wins over defaults on key conflicts.
+   */
+  defaultContext?: Record<string, unknown>;
+  /**
+   * Automatically attach a stable traceId to every event logged by this instance.
+   * A fresh UUID is generated at construction time and reused for the instance lifetime.
+   * Child instances created via `withContext()` receive their own unique traceId.
+   * Set to `false` to opt out of automatic traceId generation.
+   * @default true
+   */
+  autoTraceId?: boolean;
 }
 
 /**
@@ -57,7 +85,8 @@ export interface LogResponse {
   data?: {
     eventId: string;
     timestamp: string;
-    hmacVerified?: boolean; // Indicates if HMAC verification was used
+    hmacVerified?: boolean;
+    traceId?: string;
   };
 }
 
@@ -71,11 +100,17 @@ export class EchoNova {
   private readonly baseUrl: string;
   private readonly timeout: number;
   private readonly enableHMAC: boolean;
+  private readonly defaultContext: Record<string, unknown>;
+  private readonly autoTraceId: boolean;
+  /** Stable correlation ID for all events logged by this instance. */
+  private readonly instanceTraceId: string | undefined;
 
   /**
-   * Create a new TinyOwl client instance
+   * Create a new TinyOwl client instance.
+   * @param config - SDK configuration
+   * @param _instanceTraceId - Internal use only: override the generated traceId (used by withContext)
    */
-  constructor(config: EchoNovaConfig) {
+  constructor(config: EchoNovaConfig, _instanceTraceId?: string) {
     if (!config.apiKey) {
       throw new Error("API key is required");
     }
@@ -84,6 +119,8 @@ export class EchoNova {
     this.projectSecret = config.projectSecret;
     this.baseUrl = config.baseUrl || "http://localhost:5001/api";
     this.timeout = config.timeout || 5000;
+    this.defaultContext = config.defaultContext ?? {};
+    this.autoTraceId = config.autoTraceId !== false;
 
     // Enable HMAC by default when projectSecret is provided
     this.enableHMAC =
@@ -103,18 +140,82 @@ export class EchoNova {
       );
       this.enableHMAC = false;
     }
+
+    // instanceTraceId: explicit override > auto-generate > undefined
+    if (_instanceTraceId !== undefined) {
+      this.instanceTraceId = _instanceTraceId;
+    } else {
+      this.instanceTraceId = this.autoTraceId ? newUUID() : undefined;
+    }
   }
 
   /**
-   * Log an event to TinyOwl
+   * Create a child logger scope with merged default context.
+   *
+   * Each child receives its own fresh traceId (unless you supply one via `partial.traceId`).
+   * This is useful for scoping logs to a specific request, job, or user session:
+   *
+   * @example
+   * ```ts
+   * const reqLogger = logger.withContext({ requestId: req.id, userId: user.id });
+   * reqLogger.info("Request started");   // traceId auto-assigned to this scope
+   * reqLogger.error("Unhandled error");  // same traceId — events are correlated
+   * ```
+   */
+  withContext(partial: Record<string, unknown>): EchoNova {
+    // Validate or generate child traceId
+    const rawTraceId = partial.traceId;
+    let childTraceId: string | undefined;
+
+    if (typeof rawTraceId === "string") {
+      if (TRACE_ID_RE.test(rawTraceId)) {
+        childTraceId = rawTraceId;
+      } else {
+        console.warn(
+          `TinyOwl SDK: Invalid traceId in withContext "${rawTraceId.substring(0, 40)}" — a fresh traceId will be generated.`,
+        );
+        childTraceId = this.autoTraceId ? newUUID() : undefined;
+      }
+    } else if (this.autoTraceId) {
+      childTraceId = newUUID();
+    }
+
+    // Merge parent defaultContext + partial (sans traceId — it lives on the instance)
+    const { traceId: _unused, ...partialWithoutTraceId } = partial;
+    const mergedDefaultContext: Record<string, unknown> = {
+      ...this.defaultContext,
+      ...partialWithoutTraceId,
+    };
+
+    return new EchoNova(
+      {
+        apiKey: this.apiKey,
+        ...(this.projectSecret !== undefined
+          ? { projectSecret: this.projectSecret }
+          : {}),
+        baseUrl: this.baseUrl,
+        timeout: this.timeout,
+        enableHMAC: this.enableHMAC,
+        defaultContext: mergedDefaultContext,
+        autoTraceId: this.autoTraceId,
+      },
+      childTraceId,
+    );
+  }
+
+  /**
+   * Log an event to TinyOwl.
+   *
+   * The final context sent to the backend is composed as:
+   * `defaultContext` (instance) → `options.context` (call-site overrides). `traceId` is sent
+   * as a top-level wire field only — it is never injected into the `context` object.
    */
   async log(message: string, options: LogOptions = {}): Promise<LogResponse> {
-    // Validate inputs
     if (!message || typeof message !== "string") {
       throw new Error("Message is required and must be a string");
     }
 
-    const { severity = "info", context = {} } = options;
+    const { severity = "info", context: callContext = {} } = options;
     const validSeverities: Severity[] = ["info", "warning", "error"];
 
     if (!validSeverities.includes(severity)) {
@@ -123,12 +224,38 @@ export class EchoNova {
       );
     }
 
-    // Create request payload
-    const payload = {
+    // Merge defaultContext + callContext (callContext wins on key conflicts)
+    const mergedContext: Record<string, unknown> = {
+      ...this.defaultContext,
+      ...callContext,
+    };
+
+    // Resolve traceId: explicit in merged context > instanceTraceId
+    const rawTraceId = mergedContext.traceId;
+    let resolvedTraceId: string | undefined;
+
+    if (typeof rawTraceId === "string") {
+      if (TRACE_ID_RE.test(rawTraceId)) {
+        resolvedTraceId = rawTraceId;
+      } else {
+        console.warn(
+          `TinyOwl SDK: Invalid traceId format "${rawTraceId.substring(0, 40)}" — ignored. Must match [A-Za-z0-9._:-]{1,128}.`,
+        );
+      }
+    } else if (this.instanceTraceId !== undefined) {
+      resolvedTraceId = this.instanceTraceId;
+    }
+
+    // Build final context: strip any explicit traceId key — it lives as a top-level field only
+    const { traceId: _unused, ...finalContext } = mergedContext;
+
+    // Wire payload — traceId is a top-level sibling of context
+    const payload: Record<string, unknown> = {
       apiKey: this.apiKey,
       message,
       severity,
-      context,
+      context: finalContext,
+      ...(resolvedTraceId !== undefined ? { traceId: resolvedTraceId } : {}),
     };
 
     // Create request headers
@@ -139,13 +266,14 @@ export class EchoNova {
     // Add HMAC security headers if enabled
     if (this.enableHMAC && this.projectSecret) {
       try {
-        // Create payload for signature (exclude apiKey from signature for security)
         const payloadForSignature = {
           message,
           severity,
-          context,
+          context: finalContext,
+          ...(resolvedTraceId !== undefined
+            ? { traceId: resolvedTraceId }
+            : {}),
         };
-
         const securityHeaders = createSecureHeaders(
           payloadForSignature,
           this.projectSecret,
@@ -174,10 +302,8 @@ export class EchoNova {
 
       clearTimeout(timeoutId);
 
-      // Parse response
       const data = (await response.json()) as LogResponse;
 
-      // Handle non-2xx responses
       if (!response.ok) {
         throw new Error(
           data.message || `HTTP ${response.status}: ${response.statusText}`,
@@ -188,12 +314,10 @@ export class EchoNova {
     } catch (error) {
       clearTimeout(timeoutId);
 
-      // Handle abort/timeout
       if (error instanceof Error && error.name === "AbortError") {
         throw new Error(`Request timeout after ${this.timeout}ms`);
       }
 
-      // Re-throw other errors
       throw error;
     }
   }
@@ -229,13 +353,14 @@ export class EchoNova {
   }
 
   /**
-   * Get SDK configuration information (useful for debugging)
-   * Note: This method never exposes sensitive information like API keys or secrets
+   * Get SDK configuration information (useful for debugging).
+   * Never exposes sensitive information like API keys or secrets.
    */
   getConfig(): Omit<EchoNovaConfig, "apiKey" | "projectSecret"> & {
     hasApiKey: boolean;
     hasProjectSecret: boolean;
     hmacEnabled: boolean;
+    instanceTraceId?: string;
   } {
     return {
       baseUrl: this.baseUrl,
@@ -244,6 +369,9 @@ export class EchoNova {
       hasApiKey: Boolean(this.apiKey),
       hasProjectSecret: Boolean(this.projectSecret),
       hmacEnabled: this.enableHMAC,
+      ...(this.instanceTraceId !== undefined
+        ? { instanceTraceId: this.instanceTraceId }
+        : {}),
     };
   }
 }
