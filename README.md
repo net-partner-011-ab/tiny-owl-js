@@ -17,13 +17,14 @@ The file contains step-by-step integration instructions, framework examples (Exp
 ```javascript
 import { TinyOwl } from "@tiny-owl-kit/observability";
 
-// TinyOwl SDK - Enhanced Security Mode (Required)
+// TinyOwl SDK v1.3.1 — Enhanced Security Mode (Required)
 const tinyowl = new TinyOwl({
   apiKey: "YOUR_API_KEY",
   projectSecret: "YOUR_PROJECT_SECRET", // 🔒 Required for HMAC verification
+  autoTraceId: true, // 🔗 Auto-assigns a trace ID per SDK instance
 });
 
-// Log an event
+// All log() calls from this instance share the same traceId
 await tinyowl.log("User signed in", {
   severity: "info",
   context: { userId: "123" },
@@ -66,6 +67,8 @@ const client = new TinyOwl({
   projectSecret: "YOUR_PROJECT_SECRET", // Required: For HMAC verification
   baseUrl: "https://be.tiny-owl-kit.io/api", // Optional: API endpoint
   timeout: 5000, // Optional: Request timeout (ms)
+  autoTraceId: true, // Optional: Auto-generate trace ID per instance
+  defaultContext: { service: "api" }, // Optional: Merged into every log() call
 });
 ```
 
@@ -116,6 +119,46 @@ await client.log("Database connection failed", {
   },
 });
 ```
+
+### 🔗 Trace ID Correlation (v1.3.1)
+
+Use `autoTraceId` to automatically group all events from an SDK instance under a shared trace ID. In the dashboard you can click any traceId chip to filter the entire trace.
+
+```javascript
+// Each SDK instance gets its own stable trace ID
+const client = new TinyOwl({
+  apiKey: process.env.TINYOWL_API_KEY,
+  projectSecret: process.env.TINYOWL_PROJECT_SECRET,
+  autoTraceId: true,
+});
+
+console.log(client.getConfig().instanceTraceId); // e.g. "3f2a1b4c-..."
+
+// All calls from this instance share the same traceId automatically
+await client.log("Job started", { severity: "info" });
+await client.log("Step 1 complete", { severity: "info" });
+await client.log("Job finished", { severity: "info" });
+```
+
+Use `withContext()` to create a child logger scoped to a specific request or session:
+
+```javascript
+// Express middleware example
+app.use(async (req, res, next) => {
+  req.logger = client.withContext({ requestId: req.id, path: req.path });
+  next();
+});
+
+// All events from req.logger share their own traceId
+await req.logger.log("Request received", { severity: "info" });
+await req.logger.log("Auth check passed", { severity: "info" });
+await req.logger.log("Response sent", {
+  severity: "info",
+  context: { status: 200 },
+});
+```
+
+> **Good traceId values**: HTTP `X-Request-Id`, a job run ID, or a user session token. Use one ID per logical operation and reuse it across all events from that context.
 
 ### Convenience Methods
 
@@ -306,7 +349,8 @@ All logging methods return a promise that resolves to:
   data: {
     eventId: "64f1a2b3c4d5e6f7g8h9i0j1",
     timestamp: "2025-09-18T10:30:45.123Z",
-    hmacVerified: true  // Always true - HMAC verification is mandatory
+    hmacVerified: true,        // Always true - HMAC verification is mandatory
+    traceId: "3f2a1b4c-..."   // Present when traceId was sent
   }
 }
 ```
@@ -358,7 +402,8 @@ console.log(config);
 //   timeout: 5000,
 //   hasApiKey: true,
 //   hasProjectSecret: true,
-//   hmacEnabled: true  // Always true
+//   hmacEnabled: true,         // Always true
+//   instanceTraceId: "3f2a1b4c-..."  // Present when autoTraceId: true
 // }
 ```
 
@@ -510,5 +555,5 @@ For issues and questions:
 
 ---
 
-**Version**: 1.2.4  
-**Last Updated**: May 18, 2026
+**Version**: 1.3.1  
+**Last Updated**: May 20, 2026
