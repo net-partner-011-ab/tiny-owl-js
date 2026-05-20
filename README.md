@@ -17,7 +17,7 @@ The file contains step-by-step integration instructions, framework examples (Exp
 ```javascript
 import { TinyOwl } from "@tiny-owl-kit/observability";
 
-// TinyOwl SDK v1.3.1 — Enhanced Security Mode (Required)
+// TinyOwl SDK v1.3.2 — Enhanced Security Mode (Required)
 const tinyowl = new TinyOwl({
   apiKey: "YOUR_API_KEY",
   projectSecret: "YOUR_PROJECT_SECRET", // 🔒 Required for HMAC verification
@@ -120,7 +120,7 @@ await client.log("Database connection failed", {
 });
 ```
 
-### 🔗 Trace ID Correlation (v1.3.1)
+### 🔗 Trace ID Correlation (v1.3.2)
 
 Use `autoTraceId` to automatically group all events from an SDK instance under a shared trace ID. In the dashboard you can click any traceId chip to filter the entire trace.
 
@@ -555,5 +555,5 @@ For issues and questions:
 
 ---
 
-**Version**: 1.3.1  
+**Version**: 1.3.2  
 **Last Updated**: May 20, 2026

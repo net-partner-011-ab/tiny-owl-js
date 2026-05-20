@@ -50,6 +50,7 @@ export const logger = new TinyOwl({
   projectSecret: process.env.TINYOWL_PROJECT_SECRET, // enables HMAC signing
   baseUrl: process.env.TINYOWL_BASE_URL, // optional, defaults to http://localhost:5001/api
   timeout: 5000, // optional, milliseconds
+  autoTraceId: true, // auto-assigns a trace ID per SDK instance
 });
 ```
 
@@ -66,6 +67,7 @@ export const logger = new TinyOwl({
   apiKey: process.env.TINYOWL_API_KEY!,
   projectSecret: process.env.TINYOWL_PROJECT_SECRET,
   baseUrl: process.env.TINYOWL_BASE_URL,
+  autoTraceId: true, // auto-assigns a trace ID per SDK instance
 });
 ```
 
@@ -112,7 +114,53 @@ await logger.log("Order created", {
 | `info(message, context?)`    | `message: string`, `context?: Record<string, any>`     | Shorthand for severity `"info"`              |
 | `warning(message, context?)` | `message: string`, `context?: Record<string, any>`     | Shorthand for severity `"warning"`           |
 | `error(message, context?)`   | `message: string`, `context?: Record<string, any>`     | Shorthand for severity `"error"`             |
+| `withContext(context?)`      | `context?: Record<string, any>`                        | Returns a child logger with a fresh traceId  |
 | `getConfig()`                | —                                                      | Returns config metadata (no secrets exposed) |
+
+---
+
+## Trace ID correlation
+
+A `traceId` groups multiple related events so you can filter the full trace in the TinyOwl dashboard with a single click.
+
+### Option A — `autoTraceId` (simplest)
+
+Add `autoTraceId: true` to the constructor. All events from that instance automatically share the same trace ID:
+
+```javascript
+const logger = new TinyOwl({
+  apiKey: process.env.TINYOWL_API_KEY,
+  projectSecret: process.env.TINYOWL_PROJECT_SECRET,
+  autoTraceId: true, // ← one line change
+});
+
+// All three share the same traceId — filterable together in the dashboard
+await logger.info("Job started", { jobId: "123" });
+await logger.warning("Slow step", { duration: 3200 });
+await logger.info("Job finished", { jobId: "123" });
+```
+
+### Option B — `withContext()` (per-request/session scope)
+
+Create a child logger scoped to a specific request or session. Each child gets its own fresh trace ID:
+
+```javascript
+// Express.js example
+app.use((req, res, next) => {
+  req.logger = logger.withContext({ requestId: req.id, path: req.path });
+  next();
+});
+
+// All events from req.logger share the same traceId
+await req.logger.info("Request received");
+await req.logger.info("Auth passed", { userId: req.user.id });
+await req.logger.info("Response sent", { status: 200 });
+// ↑ click any of these in the dashboard to filter the entire request trace
+```
+
+> **Good traceId values**: HTTP `X-Request-Id`, a background job ID, or a user session token.
+> Use one ID per logical operation and reuse it across all events from that context.
+> Do **not** generate a new random ID per individual log call — that defeats the purpose.
 
 ---
 
@@ -263,9 +311,10 @@ All logging methods resolve to:
   success: boolean;
   message: string;
   data?: {
-    eventId: string;      // unique ID of the stored event
-    timestamp: string;    // ISO 8601
+    eventId: string;       // unique ID of the stored event
+    timestamp: string;     // ISO 8601
     hmacVerified?: boolean; // true when projectSecret was used
+    traceId?: string;      // present when traceId was sent
   };
 }
 ```
@@ -288,7 +337,7 @@ const logger = new TinyOwl({
 // Config check (never logs secrets)
 console.log(logger.getConfig());
 // Expected output:
-// { baseUrl: "...", timeout: 5000, hasApiKey: true, hasProjectSecret: true, hmacEnabled: true }
+// { baseUrl: "...", timeout: 5000, hasApiKey: true, hasProjectSecret: true, hmacEnabled: true, instanceTraceId: "..." }
 
 // Connectivity test
 const result = await logger.info("SDK integration test");
@@ -312,3 +361,26 @@ console.log(result);
 - [security-examples.js](./examples/security-examples.js) — security feature examples
 - [security-hardening.js](./examples/security-hardening.js) — production hardening examples
 - [TypeScript definitions](./index.d.ts) — full type reference
+
+---
+
+## Upgrading from v1.2.x
+
+No breaking changes. Existing code continues to work without modification.
+
+To enable trace ID correlation, add `autoTraceId: true` to your existing config:
+
+```javascript
+// Before (still works)
+const logger = new TinyOwl({
+  apiKey: process.env.TINYOWL_API_KEY,
+  projectSecret: process.env.TINYOWL_PROJECT_SECRET,
+});
+
+// After — one line added
+const logger = new TinyOwl({
+  apiKey: process.env.TINYOWL_API_KEY,
+  projectSecret: process.env.TINYOWL_PROJECT_SECRET,
+  autoTraceId: true, // ← enables trace filtering in the dashboard
+});
+```
