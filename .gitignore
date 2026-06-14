@@ -21,6 +21,13 @@ Thumbs.db
 *.swo
 *~
 
+# Environment
+.env
+.env.local
+
 # Build
 dist/
 build/
+
+#Testing
+test-local.mjs

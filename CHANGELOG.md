@@ -7,7 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.2.6] - Unreleased
+## [1.2.6] - 2026-06-14
+
+### Added
+
+- **`autoTraceId`** config option (default `true`): every `EchoNova` instance
+  auto-generates a stable UUID v4 `instanceTraceId` at construction time, so
+  events from the same logger instance are correlated without any code change.
+  Set `autoTraceId: false` to opt out.
+- **`defaultContext`** config option: a `Record<string, unknown>` merged into
+  every log call made on the instance. Useful for process-wide fields
+  (`service`, `env`, `version`).
+- **`withContext(partial)`** method: returns a new child `EchoNova` instance
+  that merges `partial` on top of the parent's `defaultContext` and auto-assigns
+  a fresh `traceId` to the child scope. Use this for per-request / per-job
+  correlation in long-running servers — the child logger's `traceId` is unique
+  and independent from the parent's.
+- **Top-level `traceId` wire field**: `traceId` is now sent as a first-class
+  sibling of `context` in the ingest payload (not embedded inside `context`).
+  The backend indexes this field for O(log n) correlation queries.
+- **Validation**: `traceId` values are validated against
+  `[A-Za-z0-9._:-]{1,128}`. Invalid values are silently dropped with a
+  `console.warn`; the event is still delivered (never throws).
+- **Merge precedence**: `per-call context.traceId` > `withContext` scope >
+  `defaultContext` > `instanceTraceId` (auto). Per-call context fields override
+  `defaultContext` on key conflicts.
+
+### Changed
+
+- HMAC signing now explicitly includes `traceId` in the signed payload when
+  present. (No algorithm change — the full body was already signed; this is a
+  documentation clarification and explicit test coverage.)
+
+### Notes for upgraders
+
+- **No breaking changes.** All existing single-arg `logger.info("msg")` and
+  two-arg `logger.info("msg", { context })` calls continue to work unchanged.
+- Existing users will notice `traceId` appearing in the ingest payload by
+  default (from `autoTraceId: true`). Requires backend ≥ the version that added
+  `Event.traceId` (task 013.5). Older backends silently ignore the extra field.
+- To disable: `new EchoNova({ ..., autoTraceId: false })`.
 
 ## [1.2.5] - 2026-05-18
 
