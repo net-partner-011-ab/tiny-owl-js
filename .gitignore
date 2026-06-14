@@ -24,3 +24,12 @@ Thumbs.db
 # Build
 dist/
 build/
+
+# ENV
+.env
+
+# TEST
+*.test.js
+*.spec.js
+*.test.ts
+test-local.mjs
